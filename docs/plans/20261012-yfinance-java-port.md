@@ -166,12 +166,12 @@ YFinanceException (RuntimeException)
 - Create: `spike/YahooSpike.java` (single-file `java` source program, deleted after the spike)
 - Create: `docs/notes/20261012-transport-spike.md`
 
-- [ ] write single-file program: JDK `HttpClient` with Chrome-like User-Agent; run cookie (`fc.yahoo.com`) + crumb flow
-- [ ] issue ~50 chart and quoteSummary requests across 10 symbols at concurrency 1, 4, 8; record status codes, 429 count, latency
-- [ ] repeat with HTTP/2 forced and HTTP/1.1 forced; note differences
-- [ ] document results and decision (JDK transport OK / needs alternative transport module) in `docs/notes/20261012-transport-spike.md`; if an alternative is needed add a ➕ task to this plan before Task 3
-- [ ] delete `spike/` (keep the notes)
-- [ ] no automated tests for the spike (throwaway code); the findings note is the deliverable
+- [x] write single-file program: JDK `HttpClient` with Chrome-like User-Agent; run cookie (`fc.yahoo.com`) + crumb flow
+- [x] issue ~50 chart and quoteSummary requests across 10 symbols at concurrency 1, 4, 8; record status codes, 429 count, latency
+- [x] repeat with HTTP/2 forced and HTTP/1.1 forced; note differences
+- [x] document results and decision (JDK transport OK / needs alternative transport module) in `docs/notes/20261012-transport-spike.md`; if an alternative is needed add a ➕ task to this plan before Task 3 (result: JDK transport OK with Chrome-like TLS cipher suites; no alternative module needed, ➕ item added to Task 4)
+- [x] delete `spike/` (keep the notes)
+- [x] no automated tests for the spike (throwaway code); the findings note is the deliverable (skipped - not automatable)
 
 ### Task 2: Multi-module Maven build skeleton
 
@@ -217,6 +217,7 @@ YFinanceException (RuntimeException)
 - Create: `yfin-core/src/test/java/io/andreygrigoriev/yfin/internal/http/JdkTransportTest.java`
 
 - [ ] implement over `java.net.http.HttpClient` (virtual-thread executor, timeouts, proxy, redirect policy NORMAL, gzip decoding)
+- [ ] ➕ configure Chrome-like `SSLParameters` (cipher suite list required; named groups, signature schemes, TLSv1.3/1.2) and default Chrome User-Agent: default JDK TLS is blocked with 429 by Yahoo (see `docs/notes/20261012-transport-spike.md`); test asserts the configured cipher list
 - [ ] own a `CookieManager` (in-memory cookie store) exposed to session for persistence
 - [ ] map `IOException`/`HttpTimeoutException`/interrupts to `YFTransportException` (restore interrupt flag)
 - [ ] write tests against a local `com.sun.net.httpserver.HttpServer`: GET/POST, headers, gzip body, cookies set/sent
