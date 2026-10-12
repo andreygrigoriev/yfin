@@ -446,13 +446,14 @@ YFinanceException (RuntimeException)
 - Create: `yfin-core/src/main/java/io/andreygrigoriev/yfin/exception/YFDownloadException.java` (if not already in Task 3)
 - Modify: `YFinance.java` (`download`, `tickers`)
 - Create: `yfin-core/src/test/java/io/andreygrigoriev/yfin/DownloadTest.java`
+- ⚠️ `YFDownloadException` was not part of Task 3, created here. One virtual thread per symbol; the shared `RequestLimiter` bounds in-flight HTTP requests (crumb fetch included). Non-`YFinanceException` runtime failures are wrapped in `YFinanceException`; `Error`s propagate. Interrupt while waiting → pending downloads cancelled, `YFTransportException`. `yf.tickers(String...)`/`tickers(Collection)` normalize + dedupe (no splitting of space-separated strings as in yfinance); `Tickers.ticker(String)` throws `IllegalArgumentException` for symbols outside the group; `Tickers.history()`/`history(Period)` overloads added
 
-- [ ] `YFinance.download(Collection<String>, HistoryRequest)` → `Map<String, PriceHistory>` (insertion order = input order, deduplicated)
-- [ ] fan out on virtual threads (bounded by `RequestLimiter`); wait for all; any failure → `YFDownloadException` with `failures()`, `partialResults()`, each failure added as suppressed
-- [ ] `Tickers`: `yf.tickers(...)` → `Map<String, Ticker>` access + `history(HistoryRequest)` delegating to download
-- [ ] write tests: all succeed, one fails (exception contents), all fail, duplicate symbols
-- [ ] write tests: concurrency bound respected
-- [ ] run `rtk ./mvnw verify` - must pass before next task
+- [x] `YFinance.download(Collection<String>, HistoryRequest)` → `Map<String, PriceHistory>` (insertion order = input order, deduplicated)
+- [x] fan out on virtual threads (bounded by `RequestLimiter`); wait for all; any failure → `YFDownloadException` with `failures()`, `partialResults()`, each failure added as suppressed
+- [x] `Tickers`: `yf.tickers(...)` → `Map<String, Ticker>` access + `history(HistoryRequest)` delegating to download
+- [x] write tests: all succeed, one fails (exception contents), all fail, duplicate symbols
+- [x] write tests: concurrency bound respected
+- [x] run `rtk ./mvnw verify` - must pass before next task
 
 ### Task 18: Search and Lookup
 

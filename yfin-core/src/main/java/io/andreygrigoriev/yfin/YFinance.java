@@ -1,19 +1,36 @@
 package io.andreygrigoriev.yfin;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.andreygrigoriev.yfin.exception.YFDownloadException;
+import io.andreygrigoriev.yfin.exception.YFTransportException;
+import io.andreygrigoriev.yfin.exception.YFinanceException;
 import io.andreygrigoriev.yfin.internal.cache.FileCache;
 import io.andreygrigoriev.yfin.internal.http.JdkTransport;
 import io.andreygrigoriev.yfin.internal.http.RequestLimiter;
 import io.andreygrigoriev.yfin.internal.http.RetryPolicy;
 import io.andreygrigoriev.yfin.internal.http.YahooJson;
 import io.andreygrigoriev.yfin.internal.http.YahooSession;
+import io.andreygrigoriev.yfin.model.PriceHistory;
+import io.andreygrigoriev.yfin.request.HistoryRequest;
 import io.andreygrigoriev.yfin.spi.Cache;
 import io.andreygrigoriev.yfin.spi.Transport;
 import java.net.ProxySelector;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
+import java.util.SequencedSet;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.jspecify.annotations.Nullable;
 
@@ -92,6 +109,89 @@ public final class YFinance implements AutoCloseable {
     public Ticker ticker(String symbol) {
         ensureOpen();
         return new Ticker(this, normalizeSymbol(symbol));
+    }
+
+    /**
+     * Handles for {@code symbols}, normalized like {@link #ticker(String)} and deduplicated, in
+     * input order. No request is made.
+     *
+     * @throws IllegalArgumentException when a symbol is blank
+     * @throws IllegalStateException when the client is closed
+     */
+    public Tickers tickers(Collection<String> symbols) {
+        ensureOpen();
+        return new Tickers(this, normalizeSymbols(symbols));
+    }
+
+    /** Same as {@link #tickers(Collection)}. */
+    public Tickers tickers(String... symbols) {
+        return tickers(List.of(symbols));
+    }
+
+    /**
+     * Price history of every symbol, fetched concurrently on virtual threads; the number of
+     * requests in flight is bounded by {@code maxConcurrentRequests}. Symbols are normalized like
+     * {@link #ticker(String)} and deduplicated; the map iterates in input order.
+     *
+     * <p>Strict: waits for all symbols, then throws {@link YFDownloadException} if any failed,
+     * with the failures and the histories that did succeed attached.
+     *
+     * @throws YFDownloadException when at least one symbol failed
+     * @throws YFTransportException when interrupted while waiting; pending downloads are cancelled
+     * @throws IllegalArgumentException when a symbol is blank
+     * @throws IllegalStateException when the client is closed
+     */
+    public Map<String, PriceHistory> download(Collection<String> symbols, HistoryRequest request) {
+        ensureOpen();
+        Objects.requireNonNull(request, "request");
+        return download(normalizeSymbols(symbols), request);
+    }
+
+    Map<String, PriceHistory> download(SequencedSet<String> symbols, HistoryRequest request) {
+        ensureOpen();
+        List<Future<PriceHistory>> futures = new ArrayList<>(symbols.size());
+        Map<String, PriceHistory> results = new LinkedHashMap<>();
+        Map<String, YFinanceException> failures = new LinkedHashMap<>();
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            for (String symbol : symbols) {
+                Ticker ticker = new Ticker(this, symbol);
+                futures.add(executor.submit(() -> ticker.history(request)));
+            }
+            int i = 0;
+            for (String symbol : symbols) {
+                Future<PriceHistory> future = futures.get(i++);
+                try {
+                    results.put(symbol, future.get());
+                } catch (ExecutionException e) {
+                    failures.put(symbol, asYFinanceException(symbol, e.getCause()));
+                } catch (InterruptedException e) {
+                    executor.shutdownNow();
+                    Thread.currentThread().interrupt();
+                    throw new YFTransportException("interrupted while downloading " + symbols, e);
+                }
+            }
+        }
+        if (!failures.isEmpty()) {
+            throw new YFDownloadException(failures, results);
+        }
+        return Collections.unmodifiableMap(results);
+    }
+
+    private static YFinanceException asYFinanceException(String symbol, Throwable cause) {
+        return switch (cause) {
+            case YFinanceException e -> e;
+            case Error e -> throw e;
+            default -> new YFinanceException("download failed for " + symbol + ": " + cause, cause);
+        };
+    }
+
+    static SequencedSet<String> normalizeSymbols(Collection<String> symbols) {
+        Objects.requireNonNull(symbols, "symbols");
+        SequencedSet<String> normalized = new LinkedHashSet<>();
+        for (String symbol : symbols) {
+            normalized.add(normalizeSymbol(symbol));
+        }
+        return Collections.unmodifiableSequencedSet(normalized);
     }
 
     /** Whether price repair is applied by default. */
