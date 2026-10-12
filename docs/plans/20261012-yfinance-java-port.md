@@ -216,13 +216,13 @@ YFinanceException (RuntimeException)
 - Create: `yfin-core/src/main/java/io/andreygrigoriev/yfin/internal/http/JdkTransport.java`
 - Create: `yfin-core/src/test/java/io/andreygrigoriev/yfin/internal/http/JdkTransportTest.java`
 
-- [ ] implement over `java.net.http.HttpClient` (virtual-thread executor, timeouts, proxy, redirect policy NORMAL, gzip decoding)
-- [ ] ➕ configure Chrome-like `SSLParameters` (cipher suite list required; named groups, signature schemes, TLSv1.3/1.2) and default Chrome User-Agent: default JDK TLS is blocked with 429 by Yahoo (see `docs/notes/20261012-transport-spike.md`); test asserts the configured cipher list
-- [ ] own a `CookieManager` (in-memory cookie store) exposed to session for persistence
-- [ ] map `IOException`/`HttpTimeoutException`/interrupts to `YFTransportException` (restore interrupt flag)
-- [ ] write tests against a local `com.sun.net.httpserver.HttpServer`: GET/POST, headers, gzip body, cookies set/sent
-- [ ] write tests for timeout and connection-refused error mapping
-- [ ] run `rtk ./mvnw verify` - must pass before next task
+- [x] implement over `java.net.http.HttpClient` (virtual-thread executor, timeouts, proxy, redirect policy NORMAL, gzip decoding)
+- [x] ➕ configure Chrome-like `SSLParameters` (cipher suite list required; named groups, signature schemes, TLSv1.3/1.2) and default Chrome User-Agent: default JDK TLS is blocked with 429 by Yahoo (see `docs/notes/20261012-transport-spike.md`); test asserts the configured cipher list (⚠️ named groups/signature schemes not set: `HttpClient` drops them when copying `SSLParameters`; `TLS_RSA_*` suites are filtered out as JDK 24+ disables them)
+- [x] own a `CookieManager` (in-memory cookie store) exposed to session for persistence
+- [x] map `IOException`/`HttpTimeoutException`/interrupts to `YFTransportException` (restore interrupt flag)
+- [x] write tests against a local `com.sun.net.httpserver.HttpServer`: GET/POST, headers, gzip body, cookies set/sent
+- [x] write tests for timeout and connection-refused error mapping
+- [x] run `rtk ./mvnw verify` - must pass before next task
 
 ### Task 5: RetryPolicy and RequestLimiter
 

@@ -51,6 +51,29 @@
     <build>
         <plugins>
             <plugin>
+                <!-- tests run patched into the module and use the JDK HttpServer as a local test server -->
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>default-testCompile</id>
+                        <configuration>
+                            <compilerArgs combine.children="append">
+                                <arg>--add-modules=jdk.httpserver</arg>
+                                <arg>--add-reads=io.andreygrigoriev.yfin=jdk.httpserver</arg>
+                            </compilerArgs>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <argLine>--add-modules=jdk.httpserver --add-reads=io.andreygrigoriev.yfin=jdk.httpserver</argLine>
+                </configuration>
+            </plugin>
+            <plugin>
                 <!-- test-jar shares FakeTransport and other test support with the other modules -->
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>

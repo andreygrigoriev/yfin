@@ -1,5 +1,6 @@
 /** Java port of yfinance: Yahoo Finance market data client. */
 module io.andreygrigoriev.yfin {
+    requires java.net.http;
     requires com.fasterxml.jackson.databind;
     requires com.fasterxml.jackson.datatype.jsr310;
     requires org.slf4j;
