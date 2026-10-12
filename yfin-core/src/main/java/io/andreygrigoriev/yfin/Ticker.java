@@ -3,6 +3,7 @@ package io.andreygrigoriev.yfin;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.andreygrigoriev.yfin.internal.endpoint.chart.ChartEndpoint;
 import io.andreygrigoriev.yfin.internal.endpoint.quote.QuoteEndpoint;
+import io.andreygrigoriev.yfin.internal.endpoint.quotesummary.HoldersMapper;
 import io.andreygrigoriev.yfin.internal.endpoint.quotesummary.InfoMapper;
 import io.andreygrigoriev.yfin.internal.endpoint.quotesummary.QuoteSummaryEndpoint;
 import io.andreygrigoriev.yfin.internal.endpoint.quotesummary.QuoteSummaryModule;
@@ -12,6 +13,11 @@ import io.andreygrigoriev.yfin.model.CapitalGain;
 import io.andreygrigoriev.yfin.model.Dividend;
 import io.andreygrigoriev.yfin.model.FastInfo;
 import io.andreygrigoriev.yfin.model.HistoryMetadata;
+import io.andreygrigoriev.yfin.model.Holder;
+import io.andreygrigoriev.yfin.model.InsiderPurchases;
+import io.andreygrigoriev.yfin.model.InsiderRosterEntry;
+import io.andreygrigoriev.yfin.model.InsiderTransaction;
+import io.andreygrigoriev.yfin.model.MajorHolders;
 import io.andreygrigoriev.yfin.model.PriceHistory;
 import io.andreygrigoriev.yfin.model.Split;
 import io.andreygrigoriev.yfin.model.TickerInfo;
@@ -22,7 +28,9 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Supplier;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Data for one symbol. Obtained from {@link YFinance#ticker(String)}; cheap to create, makes no
@@ -163,8 +171,45 @@ public final class Ticker {
         });
     }
 
+    /** Ownership breakdown (insiders, institutions); empty when Yahoo has none, e.g. for an ETF. */
+    public Optional<MajorHolders> majorHolders() {
+        return HoldersMapper.majorHolders(module(QuoteSummaryModule.MAJOR_HOLDERS_BREAKDOWN));
+    }
+
+    /** Top institutional holders, as Yahoo orders them; empty when Yahoo has none. */
+    public List<Holder> institutionalHolders() {
+        return HoldersMapper.ownership(module(QuoteSummaryModule.INSTITUTION_OWNERSHIP));
+    }
+
+    /** Top mutual fund holders, as Yahoo orders them; empty when Yahoo has none. */
+    public List<Holder> mutualFundHolders() {
+        return HoldersMapper.ownership(module(QuoteSummaryModule.FUND_OWNERSHIP));
+    }
+
+    /** Recent insider transactions, newest first; empty when Yahoo has none. */
+    public List<InsiderTransaction> insiderTransactions() {
+        return HoldersMapper.insiderTransactions(module(QuoteSummaryModule.INSIDER_TRANSACTIONS));
+    }
+
+    /** Insider buying and selling over the last months; empty when Yahoo has none. */
+    public Optional<InsiderPurchases> insiderPurchases() {
+        return HoldersMapper.insiderPurchases(module(QuoteSummaryModule.NET_SHARE_PURCHASE_ACTIVITY));
+    }
+
+    /** Insiders and their current positions; empty when Yahoo has none. */
+    public List<InsiderRosterEntry> insiderRosterHolders() {
+        return HoldersMapper.insiderRoster(module(QuoteSummaryModule.INSIDER_HOLDERS));
+    }
+
     YFinance client() {
         return client;
+    }
+
+    /** One {@code quoteSummary} module, or {@code null} when Yahoo has no data for it. */
+    private @Nullable JsonNode module(QuoteSummaryModule module) {
+        return new QuoteSummaryEndpoint(client.session())
+                .fetch(symbol, List.of(module))
+                .get(module);
     }
 
     private ChartEndpoint chart() {

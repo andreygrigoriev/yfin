@@ -11,6 +11,8 @@ import io.andreygrigoriev.yfin.internal.endpoint.Uris;
 import io.andreygrigoriev.yfin.internal.http.YahooJson;
 import io.andreygrigoriev.yfin.internal.http.YahooSession;
 import io.andreygrigoriev.yfin.spi.HttpRequest;
+import io.andreygrigoriev.yfin.spi.HttpResponse;
+import java.io.IOException;
 import java.net.URI;
 import java.util.Collection;
 import java.util.Collections;
@@ -34,6 +36,8 @@ public final class QuoteSummaryEndpoint {
 
     static final String BASE_URL = "https://query2.finance.yahoo.com/v10/finance/quoteSummary/";
 
+    private static final String NO_FUNDAMENTALS = "No fundamentals data found";
+
     private final YahooSession session;
 
     public QuoteSummaryEndpoint(YahooSession session) {
@@ -44,7 +48,7 @@ public final class QuoteSummaryEndpoint {
      * Fetches {@code modules} for {@code symbol}.
      *
      * @return the modules Yahoo returned, in response order, values unwrapped; modules Yahoo has no data for are
-     *     absent (never an exception)
+     *     absent (never an exception); empty when Yahoo has no fundamentals data for the symbol at all
      * @throws IllegalArgumentException when {@code modules} is empty
      * @throws io.andreygrigoriev.yfin.exception.YFSymbolNotFoundException when Yahoo does not know
      *     the symbol
@@ -58,8 +62,35 @@ public final class QuoteSummaryEndpoint {
         Set<QuoteSummaryModule> requested = EnumSet.copyOf(modules);
         URI uri = Uris.uri(BASE_URL + Uris.encode(symbol), params(symbol, requested));
         LOG.debug("{}: GET {}", symbol, uri);
-        JsonNode root = YahooJson.read(session.execute(HttpRequest.get(uri)), symbol);
+        HttpResponse response = session.execute(HttpRequest.get(uri));
+        if (isNoFundamentals(response)) {
+            LOG.debug("{}: Yahoo has no fundamentals data", symbol);
+            return Map.of();
+        }
+        JsonNode root = YahooJson.read(response, symbol);
         return parse(root, requested);
+    }
+
+    /**
+     * Whether Yahoo answered {@code Not Found} with "No fundamentals data found": the symbol exists
+     * (an ETF, index or crypto pair) but none of the requested modules applies to it. An unknown
+     * symbol is reported as "Quote not found" instead.
+     */
+    static boolean isNoFundamentals(HttpResponse response) {
+        if (response.status() != 404) {
+            return false;
+        }
+        try {
+            JsonNode root = YahooJson.mapper().readTree(response.body());
+            return root != null
+                    && root.path("quoteSummary")
+                            .path("error")
+                            .path("description")
+                            .asText("")
+                            .startsWith(NO_FUNDAMENTALS);
+        } catch (IOException e) {
+            return false;
+        }
     }
 
     static Map<String, String> params(String symbol, Set<QuoteSummaryModule> modules) {

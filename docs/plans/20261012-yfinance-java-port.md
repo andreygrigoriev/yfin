@@ -337,12 +337,15 @@ YFinanceException (RuntimeException)
 - Create: `yfin-core/src/main/java/io/andreygrigoriev/yfin/internal/endpoint/quotesummary/HoldersMapper.java`
 - Modify: `Ticker.java`
 - Create: fixtures + `HoldersMapperTest`
+- ➕ Fixtures under `fixtures/quoteSummary/holders/` (`aapl`, `sap-de` partial data, `spy` and `btc-usd` 404 "No fundamentals data found"), recorded live 2026-10-12 (curl_cffi, yfinance 1.7.0 module list)
+- ⚠️ Yahoo answers ETFs/crypto/indices with 404 `Not Found` "No fundamentals data found for symbol"; `QuoteSummaryEndpoint.fetch` now returns an empty map for that (unknown symbols still say "Quote not found" → `YFSymbolNotFoundException`)
+- ⚠️ `majorDirectHolders` is not mapped: yfinance requests it but leaves its parser commented out, and Yahoo sends an empty list. Each accessor requests only its own module (yfinance requests all seven at once); `majorHolders()`/`insiderPurchases()` return `Optional`
 
-- [ ] map modules `institutionOwnership`, `fundOwnership`, `majorDirectHolders`, `majorHoldersBreakdown`, `insiderTransactions`, `insiderHolders`, `netSharePurchaseActivity`
-- [ ] `Ticker.majorHolders()`, `institutionalHolders()`, `mutualFundHolders()`, `insiderTransactions()`, `insiderPurchases()`, `insiderRosterHolders()`
-- [ ] write tests for each accessor with fixtures (equity with full data)
-- [ ] write tests for symbol without holder data (empty lists, no exception)
-- [ ] run `rtk ./mvnw verify` - must pass before next task
+- [x] map modules `institutionOwnership`, `fundOwnership`, `majorDirectHolders`, `majorHoldersBreakdown`, `insiderTransactions`, `insiderHolders`, `netSharePurchaseActivity`
+- [x] `Ticker.majorHolders()`, `institutionalHolders()`, `mutualFundHolders()`, `insiderTransactions()`, `insiderPurchases()`, `insiderRosterHolders()`
+- [x] write tests for each accessor with fixtures (equity with full data)
+- [x] write tests for symbol without holder data (empty lists, no exception)
+- [x] run `rtk ./mvnw verify` - must pass before next task
 
 ### Task 12: Analyst data, recommendations, calendar, sustainability
 

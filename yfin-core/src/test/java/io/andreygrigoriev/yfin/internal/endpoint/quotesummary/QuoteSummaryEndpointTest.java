@@ -17,6 +17,7 @@ import io.andreygrigoriev.yfin.internal.http.YahooJson;
 import io.andreygrigoriev.yfin.internal.http.YahooSession;
 import io.andreygrigoriev.yfin.spi.Cache;
 import io.andreygrigoriev.yfin.spi.HttpRequest;
+import io.andreygrigoriev.yfin.spi.HttpResponse;
 import io.andreygrigoriev.yfin.testing.FakeTransport;
 import java.util.List;
 import java.util.Map;
@@ -106,6 +107,29 @@ class QuoteSummaryEndpointTest {
         assertThatThrownBy(() -> endpoint.fetch("NOSUCHSYMBOLXYZ", InfoMapper.INFO_MODULES))
                 .isInstanceOf(YFSymbolNotFoundException.class)
                 .hasMessageContaining("NOSUCHSYMBOLXYZ");
+    }
+
+    @Test
+    void noFundamentalsDataIsEmptyNotAnError() {
+        fake.onGet(PATH + "SPY").respondFixture(404, "quoteSummary/holders/spy.json");
+
+        assertThat(endpoint.fetch("SPY", Set.of(QuoteSummaryModule.MAJOR_HOLDERS_BREAKDOWN)))
+                .isEmpty();
+    }
+
+    @Test
+    void isNoFundamentalsOnlyMatchesThat404() {
+        String noData = """
+                {"quoteSummary":{"result":null,"error":{"code":"Not Found","description":"No fundamentals data found for symbol: SPY"}}}""";
+        assertThat(QuoteSummaryEndpoint.isNoFundamentals(HttpResponse.of(404, noData)))
+                .isTrue();
+        assertThat(QuoteSummaryEndpoint.isNoFundamentals(HttpResponse.of(200, noData)))
+                .isFalse();
+        assertThat(QuoteSummaryEndpoint.isNoFundamentals(HttpResponse.of(404, """
+                        {"quoteSummary":{"result":null,"error":{"code":"Not Found","description":"Quote not found for symbol: X"}}}""")))
+                .isFalse();
+        assertThat(QuoteSummaryEndpoint.isNoFundamentals(HttpResponse.of(404, "not json {")))
+                .isFalse();
     }
 
     @Test
