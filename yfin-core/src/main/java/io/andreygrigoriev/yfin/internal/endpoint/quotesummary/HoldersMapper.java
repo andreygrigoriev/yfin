@@ -1,18 +1,19 @@
 package io.andreygrigoriev.yfin.internal.endpoint.quotesummary;
 
+import static io.andreygrigoriev.yfin.internal.endpoint.quotesummary.ModuleNodes.date;
+import static io.andreygrigoriev.yfin.internal.endpoint.quotesummary.ModuleNodes.dbl;
+import static io.andreygrigoriev.yfin.internal.endpoint.quotesummary.ModuleNodes.list;
+import static io.andreygrigoriev.yfin.internal.endpoint.quotesummary.ModuleNodes.lng;
+import static io.andreygrigoriev.yfin.internal.endpoint.quotesummary.ModuleNodes.str;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import io.andreygrigoriev.yfin.model.Holder;
 import io.andreygrigoriev.yfin.model.InsiderPurchases;
 import io.andreygrigoriev.yfin.model.InsiderRosterEntry;
 import io.andreygrigoriev.yfin.model.InsiderTransaction;
 import io.andreygrigoriev.yfin.model.MajorHolders;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneOffset;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.function.Function;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -105,43 +106,5 @@ public final class HoldersMapper {
                 dbl(module, "netPercentInsiderShares"),
                 dbl(module, "buyPercentInsiderShares"),
                 dbl(module, "sellPercentInsiderShares")));
-    }
-
-    private static <T> List<T> list(@Nullable JsonNode module, String field, Function<JsonNode, T> mapper) {
-        if (module == null) {
-            return List.of();
-        }
-        JsonNode items = module.path(field);
-        if (!items.isArray()) {
-            return List.of();
-        }
-        var out = new ArrayList<T>(items.size());
-        for (JsonNode item : items) {
-            if (item.isObject()) {
-                out.add(mapper.apply(item));
-            }
-        }
-        return List.copyOf(out);
-    }
-
-    private static @Nullable String str(JsonNode node, String field) {
-        JsonNode v = node.path(field);
-        return v.isTextual() ? v.textValue() : null;
-    }
-
-    private static @Nullable Double dbl(JsonNode node, String field) {
-        JsonNode v = node.path(field);
-        return v.isNumber() ? v.doubleValue() : null;
-    }
-
-    private static @Nullable Long lng(JsonNode node, String field) {
-        JsonNode v = node.path(field);
-        return v.isNumber() && v.canConvertToLong() ? v.longValue() : null;
-    }
-
-    /** Epoch seconds as a UTC date, like yfinance's {@code pd.to_datetime(unit="s")}. */
-    private static @Nullable LocalDate date(JsonNode node, String field) {
-        Long seconds = lng(node, field);
-        return seconds == null ? null : LocalDate.ofInstant(Instant.ofEpochSecond(seconds), ZoneOffset.UTC);
     }
 }

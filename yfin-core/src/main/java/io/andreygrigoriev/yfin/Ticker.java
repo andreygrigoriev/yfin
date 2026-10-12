@@ -3,15 +3,24 @@ package io.andreygrigoriev.yfin;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.andreygrigoriev.yfin.internal.endpoint.chart.ChartEndpoint;
 import io.andreygrigoriev.yfin.internal.endpoint.quote.QuoteEndpoint;
+import io.andreygrigoriev.yfin.internal.endpoint.quotesummary.AnalystMapper;
+import io.andreygrigoriev.yfin.internal.endpoint.quotesummary.CalendarMapper;
 import io.andreygrigoriev.yfin.internal.endpoint.quotesummary.HoldersMapper;
 import io.andreygrigoriev.yfin.internal.endpoint.quotesummary.InfoMapper;
 import io.andreygrigoriev.yfin.internal.endpoint.quotesummary.QuoteSummaryEndpoint;
 import io.andreygrigoriev.yfin.internal.endpoint.quotesummary.QuoteSummaryModule;
+import io.andreygrigoriev.yfin.internal.endpoint.quotesummary.SustainabilityMapper;
 import io.andreygrigoriev.yfin.internal.http.YahooJson;
 import io.andreygrigoriev.yfin.model.Actions;
+import io.andreygrigoriev.yfin.model.Calendar;
 import io.andreygrigoriev.yfin.model.CapitalGain;
 import io.andreygrigoriev.yfin.model.Dividend;
+import io.andreygrigoriev.yfin.model.EarningsEstimate;
+import io.andreygrigoriev.yfin.model.EarningsHistoryEntry;
+import io.andreygrigoriev.yfin.model.EpsRevisions;
+import io.andreygrigoriev.yfin.model.EpsTrend;
 import io.andreygrigoriev.yfin.model.FastInfo;
+import io.andreygrigoriev.yfin.model.GrowthEstimate;
 import io.andreygrigoriev.yfin.model.HistoryMetadata;
 import io.andreygrigoriev.yfin.model.Holder;
 import io.andreygrigoriev.yfin.model.InsiderPurchases;
@@ -19,8 +28,13 @@ import io.andreygrigoriev.yfin.model.InsiderRosterEntry;
 import io.andreygrigoriev.yfin.model.InsiderTransaction;
 import io.andreygrigoriev.yfin.model.MajorHolders;
 import io.andreygrigoriev.yfin.model.PriceHistory;
+import io.andreygrigoriev.yfin.model.PriceTargets;
+import io.andreygrigoriev.yfin.model.Recommendation;
+import io.andreygrigoriev.yfin.model.RevenueEstimate;
 import io.andreygrigoriev.yfin.model.Split;
+import io.andreygrigoriev.yfin.model.Sustainability;
 import io.andreygrigoriev.yfin.model.TickerInfo;
+import io.andreygrigoriev.yfin.model.UpgradeDowngrade;
 import io.andreygrigoriev.yfin.request.HistoryRequest;
 import io.andreygrigoriev.yfin.request.Interval;
 import io.andreygrigoriev.yfin.request.Period;
@@ -199,6 +213,70 @@ public final class Ticker {
     /** Insiders and their current positions; empty when Yahoo has none. */
     public List<InsiderRosterEntry> insiderRosterHolders() {
         return HoldersMapper.insiderRoster(module(QuoteSummaryModule.INSIDER_HOLDERS));
+    }
+
+    /** Analyst rating counts per month, current month ({@code 0m}) first; empty when Yahoo has none. */
+    public List<Recommendation> recommendations() {
+        return AnalystMapper.recommendations(module(QuoteSummaryModule.RECOMMENDATION_TREND));
+    }
+
+    /** Same as {@link #recommendations()}, like yfinance's {@code recommendations_summary}. */
+    public List<Recommendation> recommendationsSummary() {
+        return recommendations();
+    }
+
+    /** Analyst rating changes, newest first; empty when Yahoo has none. */
+    public List<UpgradeDowngrade> upgradesDowngrades() {
+        return AnalystMapper.upgradesDowngrades(module(QuoteSummaryModule.UPGRADE_DOWNGRADE_HISTORY));
+    }
+
+    /** Analyst price targets and the current price; empty when Yahoo has none, e.g. for an ETF. */
+    public Optional<PriceTargets> analystPriceTargets() {
+        return AnalystMapper.priceTargets(module(QuoteSummaryModule.FINANCIAL_DATA));
+    }
+
+    /** EPS estimates for the current and next quarter and fiscal year; empty when Yahoo has none. */
+    public List<EarningsEstimate> earningsEstimate() {
+        return AnalystMapper.earningsEstimate(module(QuoteSummaryModule.EARNINGS_TREND));
+    }
+
+    /** Revenue estimates for the current and next quarter and fiscal year; empty when Yahoo has none. */
+    public List<RevenueEstimate> revenueEstimate() {
+        return AnalystMapper.revenueEstimate(module(QuoteSummaryModule.EARNINGS_TREND));
+    }
+
+    /** Reported versus estimated EPS for the last four quarters, oldest first; empty when Yahoo has none. */
+    public List<EarningsHistoryEntry> earningsHistory() {
+        return AnalystMapper.earningsHistory(module(QuoteSummaryModule.EARNINGS_HISTORY));
+    }
+
+    /** How the mean EPS estimates moved over the last 90 days; empty when Yahoo has none. */
+    public List<EpsTrend> epsTrend() {
+        return AnalystMapper.epsTrend(module(QuoteSummaryModule.EARNINGS_TREND));
+    }
+
+    /** Upward and downward EPS estimate revisions; empty when Yahoo has none. */
+    public List<EpsRevisions> epsRevisions() {
+        return AnalystMapper.epsRevisions(module(QuoteSummaryModule.EARNINGS_TREND));
+    }
+
+    /**
+     * Expected growth of the symbol next to its industry, sector and index, per period; one
+     * request. Empty when Yahoo has none.
+     */
+    public List<GrowthEstimate> growthEstimates() {
+        return AnalystMapper.growthEstimates(
+                new QuoteSummaryEndpoint(client.session()).fetch(symbol, AnalystMapper.GROWTH_MODULES));
+    }
+
+    /** Next earnings date with estimate ranges, and dividend dates; empty when Yahoo has none. */
+    public Optional<Calendar> calendar() {
+        return CalendarMapper.calendar(module(QuoteSummaryModule.CALENDAR_EVENTS));
+    }
+
+    /** ESG risk scores; empty when Yahoo has none (currently the case for most symbols). */
+    public Optional<Sustainability> sustainability() {
+        return SustainabilityMapper.sustainability(module(QuoteSummaryModule.ESG_SCORES));
     }
 
     YFinance client() {

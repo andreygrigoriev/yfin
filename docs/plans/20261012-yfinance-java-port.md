@@ -354,14 +354,18 @@ YFinanceException (RuntimeException)
 - Create: `yfin-core/src/main/java/io/andreygrigoriev/yfin/internal/endpoint/quotesummary/{AnalystMapper,CalendarMapper,SustainabilityMapper}.java`
 - Modify: `Ticker.java`
 - Create: fixtures + mapper tests
+- ➕ Create: `internal/endpoint/quotesummary/ModuleNodes.java` (typed node reads shared with `HoldersMapper`), tests `AnalystMapperTest`, `CalendarMapperTest`, `SustainabilityMapperTest`
+- ➕ Fixtures under `fixtures/quoteSummary/analysis/` (`aapl` with `upgradeDowngradeHistory` trimmed to the newest 20 of 971 entries, `sap-de`, `spy`/`btc-usd` 404, `aapl-esg` 404), recorded live 2026-10-12 (curl_cffi, yfinance 1.7.0 parameters)
+- ⚠️ Yahoo no longer sends `esgScores`: requested with other modules it is omitted, requested alone it gets 404 "No fundamentals data found" (AAPL, MSFT, XOM, TSLA probed). `msft-esg-synthetic.json` is a synthetic payload in the historical shape
+- ⚠️ `recommendationsSummary()` is an alias of `recommendations()`, as in yfinance. Empty `upgradeDowngradeHistory` gives an empty list (yfinance raises). Estimate records also carry the period `endDate`; calendar dates are UTC (yfinance uses local time). `growthEstimates()` fetches its four modules in one request
 
-- [ ] recommendations (`recommendationTrend`), recommendations summary, upgrades/downgrades (`upgradeDowngradeHistory`)
-- [ ] analyst price targets, earnings estimate, revenue estimate, earnings history, EPS trend, EPS revisions, growth estimates (`earningsTrend`, `earningsHistory`, `financialData`, `industryTrend` etc. per yfinance)
-- [ ] calendar (`calendarEvents`: earnings dates, ex-dividend, dividend date, estimate ranges)
-- [ ] sustainability (`esgScores`) as typed core fields + raw map
-- [ ] write tests per accessor with fixtures
-- [ ] write tests for missing modules (ETF, crypto) → empty/null results
-- [ ] run `rtk ./mvnw verify` - must pass before next task
+- [x] recommendations (`recommendationTrend`), recommendations summary, upgrades/downgrades (`upgradeDowngradeHistory`)
+- [x] analyst price targets, earnings estimate, revenue estimate, earnings history, EPS trend, EPS revisions, growth estimates (`earningsTrend`, `earningsHistory`, `financialData`, `industryTrend` etc. per yfinance)
+- [x] calendar (`calendarEvents`: earnings dates, ex-dividend, dividend date, estimate ranges)
+- [x] sustainability (`esgScores`) as typed core fields + raw map
+- [x] write tests per accessor with fixtures
+- [x] write tests for missing modules (ETF, crypto) → empty/null results
+- [x] run `rtk ./mvnw verify` - must pass before next task
 
 ### Task 13: Financial statements (timeseries endpoint)
 
