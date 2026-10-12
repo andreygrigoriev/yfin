@@ -291,15 +291,22 @@ YFinanceException (RuntimeException)
 - Create: `yfin-core/src/test/resources/fixtures/chart/*.json`
 - Create: `yfin-core/src/test/java/io/andreygrigoriev/yfin/internal/endpoint/chart/ChartMapperTest.java`
 - Create: `yfin-core/src/test/java/io/andreygrigoriev/yfin/TickerHistoryTest.java`
+- ➕ Create: `yfin-core/src/main/java/io/andreygrigoriev/yfin/model/{HistoryMetadata,Actions}.java` (typed chart metadata + `raw()`; return type of `Ticker.actions()`)
+- ➕ Create: `yfin-core/src/main/java/io/andreygrigoriev/yfin/internal/endpoint/chart/{ChartQuery,package-info}.java` (request resolved to `range` or `period1/period2`)
+- ➕ Modify: `yfin-core/src/main/java/io/andreygrigoriev/yfin/internal/http/YahooJson.java` (`toPlain(JsonNode)` for `raw()` maps, with test)
+- ➕ Create: `yfin-core/src/test/java/io/andreygrigoriev/yfin/request/HistoryRequestTest.java`
+- ➕ Delete: `model/Placeholder.java`, `request/Placeholder.java`
+- ⚠️ `PriceHistory` has an extra last component `HistoryMetadata metadata`; `Split` numerator/denominator are `double` (Yahoo sends floats). `ChartDto` is read from the JSON tree (no reflection, no native metadata needed)
+- ⚠️ Yahoo's chart endpoint currently returns no `capitalGains` events (probed funds and ETFs), so `schd-1wk-capital-gains.json` is a recorded SCHD response with one synthetic capital-gains event added; `partiallyMissingPricesBecomeNaN` and malformed payloads are inline synthetic JSON. Other chart fixtures were recorded live (curl_cffi, yfinance 1.7.0 parameters)
 
-- [ ] `HistoryRequest` builder: period or start/end, interval, prepost, autoAdjust, backAdjust, actions, repair, keepNa; validate intraday range limits like yfinance (e.g. 1m ≤ 8 days per request, ≤ 30 days back)
-- [ ] `ChartEndpoint`: build params (`period1/period2` or `range`, `interval`, `includePrePost`, `events=div,splits,capitalGains`)
-- [ ] `ChartMapper`: timestamps → `ZonedDateTime` in `meta.exchangeTimezoneName`; nulls → NaN; drop all-NaN rows unless keepNa; auto-adjust (scale OHLC by adjclose/close) and back-adjust semantics matching yfinance; dividends/splits/capital gains from `events`
-- [ ] cache symbol → timezone in `tz` namespace (used for start/end date → epoch conversion)
-- [ ] `Ticker.history(HistoryRequest)`, `dividends()`, `splits()`, `capitalGains()`, `actions()`, `historyMetadata()`
-- [ ] write mapper tests with fixtures: daily equity, intraday with prepost, ETF with capital gains, crypto (24/7, UTC), symbol with splits+dividends, nulls in arrays
-- [ ] write tests for error cases: delisted symbol → `YFSymbolNotFoundException`, invalid interval/range combination → `IllegalArgumentException`, malformed payload → `YFDataException`
-- [ ] run `rtk ./mvnw verify` - must pass before next task
+- [x] `HistoryRequest` builder: period or start/end, interval, prepost, autoAdjust, backAdjust, actions, repair, keepNa; validate intraday range limits like yfinance (e.g. 1m ≤ 8 days per request, ≤ 30 days back)
+- [x] `ChartEndpoint`: build params (`period1/period2` or `range`, `interval`, `includePrePost`, `events=div,splits,capitalGains`)
+- [x] `ChartMapper`: timestamps → `ZonedDateTime` in `meta.exchangeTimezoneName`; nulls → NaN; drop all-NaN rows unless keepNa; auto-adjust (scale OHLC by adjclose/close) and back-adjust semantics matching yfinance; dividends/splits/capital gains from `events`
+- [x] cache symbol → timezone in `tz` namespace (used for start/end date → epoch conversion)
+- [x] `Ticker.history(HistoryRequest)`, `dividends()`, `splits()`, `capitalGains()`, `actions()`, `historyMetadata()`
+- [x] write mapper tests with fixtures: daily equity, intraday with prepost, ETF with capital gains, crypto (24/7, UTC), symbol with splits+dividends, nulls in arrays
+- [x] write tests for error cases: delisted symbol → `YFSymbolNotFoundException`, invalid interval/range combination → `IllegalArgumentException`, malformed payload → `YFDataException`
+- [x] run `rtk ./mvnw verify` - must pass before next task
 
 ### Task 10: quoteSummary infrastructure + info and fast_info
 

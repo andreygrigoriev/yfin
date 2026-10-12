@@ -9,6 +9,9 @@ import io.andreygrigoriev.yfin.exception.YFDataException;
 import io.andreygrigoriev.yfin.exception.YFSymbolNotFoundException;
 import io.andreygrigoriev.yfin.spi.HttpResponse;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import org.jspecify.annotations.Nullable;
@@ -83,6 +86,50 @@ public final class YahooJson {
             }
             throw new YFDataException(message, body, null);
         }
+    }
+
+    /**
+     * Converts a JSON tree to plain, unmodifiable Java values: objects to insertion-ordered {@code
+     * Map<String, Object>} (null members dropped), arrays to {@code List<Object>} (null elements
+     * dropped), integral numbers to {@code Long} (or {@code BigInteger} when too large), other
+     * numbers to {@code Double}, plus {@code String} and {@code Boolean}.
+     *
+     * @return the value, or {@code null} for JSON {@code null} and missing nodes
+     */
+    public static @Nullable Object toPlain(JsonNode node) {
+        if (node.isNull() || node.isMissingNode()) {
+            return null;
+        }
+        if (node.isObject()) {
+            var map = new LinkedHashMap<String, Object>();
+            for (Map.Entry<String, JsonNode> e : node.properties()) {
+                Object value = toPlain(e.getValue());
+                if (value != null) {
+                    map.put(e.getKey(), value);
+                }
+            }
+            return Collections.unmodifiableMap(map);
+        }
+        if (node.isArray()) {
+            var list = new ArrayList<Object>(node.size());
+            for (JsonNode element : node) {
+                Object value = toPlain(element);
+                if (value != null) {
+                    list.add(value);
+                }
+            }
+            return Collections.unmodifiableList(list);
+        }
+        if (node.isBoolean()) {
+            return node.booleanValue();
+        }
+        if (node.isIntegralNumber()) {
+            return node.canConvertToLong() ? (Object) node.longValue() : node.bigIntegerValue();
+        }
+        if (node.isNumber()) {
+            return node.doubleValue();
+        }
+        return node.asText();
     }
 
     private static boolean isNotFound(String code) {

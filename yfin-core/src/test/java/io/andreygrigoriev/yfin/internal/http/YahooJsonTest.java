@@ -99,4 +99,29 @@ class YahooJsonTest {
     void mapperIsShared() {
         assertThat(YahooJson.mapper()).isSameAs(YahooJson.mapper());
     }
+
+    @Test
+    void toPlainConvertsTreeToJavaValues() throws IOException {
+        var node = YahooJson.mapper()
+                .readTree("{\"s\":\"x\",\"i\":3,\"big\":123456789012345678901234,\"d\":1.5,\"b\":true,"
+                        + "\"n\":null,\"a\":[1,null,\"y\"],\"o\":{\"k\":[]}}");
+
+        Object plain = YahooJson.toPlain(node);
+
+        assertThat(plain).isInstanceOf(Map.class);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> map = (Map<String, Object>) plain;
+        assertThat(map).containsOnlyKeys("s", "i", "big", "d", "b", "a", "o");
+        assertThat(map.keySet()).containsExactly("s", "i", "big", "d", "b", "a", "o");
+        assertThat(map.get("s")).isEqualTo("x");
+        assertThat(map.get("i")).isEqualTo(3L);
+        assertThat(map.get("big")).isEqualTo(new java.math.BigInteger("123456789012345678901234"));
+        assertThat(map.get("d")).isEqualTo(1.5);
+        assertThat(map.get("b")).isEqualTo(true);
+        assertThat(map.get("a")).isEqualTo(java.util.List.of(1L, "y"));
+        assertThat(map.get("o")).isEqualTo(Map.of("k", java.util.List.of()));
+        assertThatThrownBy(() -> map.put("z", 1)).isInstanceOf(UnsupportedOperationException.class);
+        assertThat(YahooJson.toPlain(YahooJson.mapper().nullNode())).isNull();
+        assertThat(YahooJson.toPlain(YahooJson.mapper().missingNode())).isNull();
+    }
 }
