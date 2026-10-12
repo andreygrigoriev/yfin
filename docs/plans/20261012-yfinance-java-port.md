@@ -412,13 +412,15 @@ YFinanceException (RuntimeException)
 - Create: `yfin-core/src/main/java/io/andreygrigoriev/yfin/internal/endpoint/options/{OptionsEndpoint,OptionsMapper}.java`
 - Modify: `Ticker.java`
 - Create: fixtures + `OptionsMapperTest`
+- ➕ Create: `internal/endpoint/options/package-info.java`; fixtures `fixtures/options/{aapl,aapl-2029-01-19,aapl-not-an-expiration,sap-de,unknown,bad-date}.json`, recorded live 2026-10-12 (curl_cffi via yfinance `YfData.get`)
+- ⚠️ `Ticker` holds no data, so `optionChain(LocalDate)` makes one request to list expirations (it already carries the nearest chain, reused when that is the one asked for) and a second one for any other date; yfinance caches expirations per `Ticker`. Added `Ticker.optionChain()` → `Optional<OptionChain>` for yfinance's `option_chain()` without date (empty when no options, yfinance returns `None`s). `OptionChain` carries `symbol`, `expiration`, `calls`, `puts`, `underlying` (`Map<String, Object>`, as yfinance's dict). `lastTradeDate` is in the exchange timezone of the underlying quote (yfinance: UTC unless `tz` given); missing volume/openInterest = `0` (yfinance NaN), per data model conventions. Unknown symbol → empty expirations (yfinance behaviour), not `YFSymbolNotFoundException`
 
-- [ ] `Ticker.optionExpirations()` → `List<LocalDate>`; `Ticker.optionChain(LocalDate)` → calls, puts, underlying quote
-- [ ] `OptionContract` fields: contractSymbol, strike, lastPrice, bid, ask, change, percentChange, volume, openInterest, impliedVolatility, inTheMoney, lastTradeDate, contractSize, currency
-- [ ] unknown expiration → `IllegalArgumentException` listing valid dates (yfinance behavior)
-- [ ] write tests: chain parsing, expirations, missing bid/ask → NaN
-- [ ] write tests: invalid expiration error, symbol without options → empty expirations
-- [ ] run `rtk ./mvnw verify` - must pass before next task
+- [x] `Ticker.optionExpirations()` → `List<LocalDate>`; `Ticker.optionChain(LocalDate)` → calls, puts, underlying quote
+- [x] `OptionContract` fields: contractSymbol, strike, lastPrice, bid, ask, change, percentChange, volume, openInterest, impliedVolatility, inTheMoney, lastTradeDate, contractSize, currency
+- [x] unknown expiration → `IllegalArgumentException` listing valid dates (yfinance behavior)
+- [x] write tests: chain parsing, expirations, missing bid/ask → NaN
+- [x] write tests: invalid expiration error, symbol without options → empty expirations
+- [x] run `rtk ./mvnw verify` - must pass before next task
 
 ### Task 16: News, shares, ISIN
 

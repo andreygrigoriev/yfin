@@ -3,6 +3,7 @@ package io.andreygrigoriev.yfin;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.andreygrigoriev.yfin.internal.endpoint.chart.ChartEndpoint;
 import io.andreygrigoriev.yfin.internal.endpoint.earnings.EarningsDatesEndpoint;
+import io.andreygrigoriev.yfin.internal.endpoint.options.OptionsEndpoint;
 import io.andreygrigoriev.yfin.internal.endpoint.quote.QuoteEndpoint;
 import io.andreygrigoriev.yfin.internal.endpoint.quotesummary.AnalystMapper;
 import io.andreygrigoriev.yfin.internal.endpoint.quotesummary.CalendarMapper;
@@ -32,6 +33,7 @@ import io.andreygrigoriev.yfin.model.InsiderPurchases;
 import io.andreygrigoriev.yfin.model.InsiderRosterEntry;
 import io.andreygrigoriev.yfin.model.InsiderTransaction;
 import io.andreygrigoriev.yfin.model.MajorHolders;
+import io.andreygrigoriev.yfin.model.OptionChain;
 import io.andreygrigoriev.yfin.model.PriceHistory;
 import io.andreygrigoriev.yfin.model.PriceTargets;
 import io.andreygrigoriev.yfin.model.Recommendation;
@@ -45,6 +47,7 @@ import io.andreygrigoriev.yfin.request.HistoryRequest;
 import io.andreygrigoriev.yfin.request.Interval;
 import io.andreygrigoriev.yfin.request.Period;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -294,6 +297,35 @@ public final class Ticker {
      */
     public List<EarningsDate> earningsDates(int limit) {
         return new EarningsDatesEndpoint(client.session(), chart()::timezone).earningsDates(symbol, limit);
+    }
+
+    /**
+     * Option expiration dates (yfinance {@code options}), nearest first. Empty when the symbol has
+     * no listed options, including an unknown symbol.
+     */
+    public List<LocalDate> optionExpirations() {
+        return new OptionsEndpoint(client.session()).expirations(symbol);
+    }
+
+    /**
+     * Calls and puts of the nearest expiration (yfinance {@code option_chain()}); empty when the
+     * symbol has no listed options.
+     */
+    public Optional<OptionChain> optionChain() {
+        return new OptionsEndpoint(client.session()).nearest(symbol);
+    }
+
+    /**
+     * Calls and puts expiring on {@code expiration} (yfinance {@code option_chain(date)}). One
+     * request for the nearest expiration, two otherwise. Last trade times are in the exchange
+     * timezone.
+     *
+     * @throws IllegalArgumentException when {@code expiration} is not one of {@link
+     *     #optionExpirations()}; the message lists the valid dates
+     */
+    public OptionChain optionChain(LocalDate expiration) {
+        Objects.requireNonNull(expiration, "expiration");
+        return new OptionsEndpoint(client.session()).chain(symbol, expiration);
     }
 
     /** ESG risk scores; empty when Yahoo has none (currently the case for most symbols). */
