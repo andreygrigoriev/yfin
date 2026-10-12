@@ -395,12 +395,15 @@ YFinanceException (RuntimeException)
 - Create: `yfin-core/src/main/java/io/andreygrigoriev/yfin/internal/endpoint/earnings/EarningsDatesEndpoint.java`
 - Modify: `Ticker.java`
 - Create: fixtures + `EarningsDatesEndpointTest`
+- ➕ Create: `internal/endpoint/earnings/package-info.java`; fixtures `fixtures/earnings/{aapl,cba-ax,gme,sap-de,spy,unknown,bad-entity}.json`, recorded live 2026-10-12 (curl_cffi via yfinance `YfData.post`)
+- ⚠️ yfinance 1.7.0 scrapes the `finance.yahoo.com/calendar/earnings` HTML page (its `visualization` code with entity `earnings` is dead: that data stopped in 2025). yfin uses `POST /v1/finance/visualization` with entity `sp_earnings` (the one yfinance's `Calendars` uses), filtered on the symbol and event types `EAD`/`ERA`, which is current JSON. No `offset` parameter. Times are converted to the exchange timezone (chart tz lookup, cached), like yfinance's screener variant. `0` values are kept (yfinance turns them into NaN), except a surprise without reported EPS, which Yahoo fills with a `0` placeholder. Empty result → empty list (yfinance returns `None`). `surprisePercent` is in percent as Yahoo sends it (`6.74` = 6.74%)
+- ⚠️ Skipped for README parity table (Task on README): yfinance `earnings` / `quarterly_earnings` / `get_earnings()` are deprecated and always return `None` ("not available via API", use `Net Income` from the income statement). Other earnings accessors are already covered: `earnings_estimate`, `earnings_history` (Task 12), `calendar` (Task 12), income statement (Task 13). The market-wide `Calendars` class (`earnings_calendar`, IPO, splits, economic events) is not a `Ticker` accessor and no task covers it yet
 
-- [ ] `Ticker.earningsDates(int limit)`: port yfinance implementation (visualization endpoint), fields: date (ZonedDateTime), EPS estimate, reported EPS, surprise %
-- [ ] any remaining yfinance earnings accessors not covered by Task 12/13 (check pinned source; deprecated ones skipped and listed in README parity table)
-- [ ] write tests with fixtures: past + future dates, missing estimates
-- [ ] write tests for empty result
-- [ ] run `rtk ./mvnw verify` - must pass before next task
+- [x] `Ticker.earningsDates(int limit)`: port yfinance implementation (visualization endpoint), fields: date (ZonedDateTime), EPS estimate, reported EPS, surprise %
+- [x] any remaining yfinance earnings accessors not covered by Task 12/13 (check pinned source; deprecated ones skipped and listed in README parity table)
+- [x] write tests with fixtures: past + future dates, missing estimates
+- [x] write tests for empty result
+- [x] run `rtk ./mvnw verify` - must pass before next task
 
 ### Task 15: Options chains
 

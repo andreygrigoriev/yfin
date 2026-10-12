@@ -2,6 +2,7 @@ package io.andreygrigoriev.yfin;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import io.andreygrigoriev.yfin.internal.endpoint.chart.ChartEndpoint;
+import io.andreygrigoriev.yfin.internal.endpoint.earnings.EarningsDatesEndpoint;
 import io.andreygrigoriev.yfin.internal.endpoint.quote.QuoteEndpoint;
 import io.andreygrigoriev.yfin.internal.endpoint.quotesummary.AnalystMapper;
 import io.andreygrigoriev.yfin.internal.endpoint.quotesummary.CalendarMapper;
@@ -17,6 +18,7 @@ import io.andreygrigoriev.yfin.model.Actions;
 import io.andreygrigoriev.yfin.model.Calendar;
 import io.andreygrigoriev.yfin.model.CapitalGain;
 import io.andreygrigoriev.yfin.model.Dividend;
+import io.andreygrigoriev.yfin.model.EarningsDate;
 import io.andreygrigoriev.yfin.model.EarningsEstimate;
 import io.andreygrigoriev.yfin.model.EarningsHistoryEntry;
 import io.andreygrigoriev.yfin.model.EpsRevisions;
@@ -276,6 +278,22 @@ public final class Ticker {
     /** Next earnings date with estimate ranges, and dividend dates; empty when Yahoo has none. */
     public Optional<Calendar> calendar() {
         return CalendarMapper.calendar(module(QuoteSummaryModule.CALENDAR_EVENTS));
+    }
+
+    /** {@link #earningsDates(int)} with yfinance's default limit of 12. */
+    public List<EarningsDate> earningsDates() {
+        return earningsDates(12);
+    }
+
+    /**
+     * Up to {@code limit} past and upcoming earnings announcements with EPS estimate, reported EPS
+     * and surprise, newest (upcoming) first. Times are in the exchange timezone, which may take
+     * one extra chart request when it is not cached. Empty when Yahoo has none, e.g. for an ETF.
+     *
+     * @throws IllegalArgumentException when {@code limit} is not in {@code 1..100} (Yahoo's cap)
+     */
+    public List<EarningsDate> earningsDates(int limit) {
+        return new EarningsDatesEndpoint(client.session(), chart()::timezone).earningsDates(symbol, limit);
     }
 
     /** ESG risk scores; empty when Yahoo has none (currently the case for most symbols). */
