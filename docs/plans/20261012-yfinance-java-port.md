@@ -478,13 +478,15 @@ YFinanceException (RuntimeException)
 - Create: `yfin-core/src/main/java/io/andreygrigoriev/yfin/{Screener}.java`, `model/ScreenerResult.java`
 - Create: `yfin-core/src/main/java/io/andreygrigoriev/yfin/internal/endpoint/screener/ScreenerEndpoint.java`
 - Create: fixtures + `ScreenerQueryTest`, `ScreenerEndpointTest`
+- ➕ Create: `request/EtfQuery.java` (yfinance 1.7.0 also has `ETFQuery`, used by the predefined ETF screens), `request/ScreenerFields.java` (generated from yfinance `const.py`), `ScreenerTest`
+- ⚠️ `Screener` is an immutable options object like `Search`: `Screener.of(query)` / `Screener.predefined(name)` with `offset`, `size` (1..250), `sort(SortField)`, run by `yf.screen(Screener|ScreenerQuery|String)` → `ScreenerResult` (quotes stay `List<Map<String, Object>>` plus `symbols()` and `raw()`). Queries are built with typed static factories (`EquityQuery.and(...)`, `gt`, `isIn`, …) or yfinance-style `EquityQuery.of("is-in", List.of(...))`; `IS_IN` is sent as `OR` of `EQ` (Yahoo has no is-in). Live check: Yahoo's POST endpoint honors `size`, not `count`, so the body sends both with the same value. A predefined screen with an offset runs as its equivalent custom query (`Screener.predefinedQuery`), as yfinance; unknown names then throw `IllegalArgumentException`. Fixtures recorded live 2026-10-12
 
-- [ ] query DSL: `and`, `or`, `eq`, `gt`, `lt`, `gte`, `lte`, `btwn`, `is-in`; validate field names and values against yfinance's allowed field/value maps (port `const.py` screener tables)
-- [ ] serialize to Yahoo JSON body; `Screener.screen(query, offset, size, sortField, sortAsc)`
-- [ ] predefined screeners (`day_gainers`, `most_actives`, …) by name via predefined endpoint
-- [ ] write tests: JSON serialization of nested queries, invalid field/operator → `IllegalArgumentException`
-- [ ] write tests: custom + predefined screen responses from fixtures
-- [ ] run `rtk ./mvnw verify` - must pass before next task
+- [x] query DSL: `and`, `or`, `eq`, `gt`, `lt`, `gte`, `lte`, `btwn`, `is-in`; validate field names and values against yfinance's allowed field/value maps (port `const.py` screener tables)
+- [x] serialize to Yahoo JSON body; `Screener.screen(query, offset, size, sortField, sortAsc)`
+- [x] predefined screeners (`day_gainers`, `most_actives`, …) by name via predefined endpoint
+- [x] write tests: JSON serialization of nested queries, invalid field/operator → `IllegalArgumentException`
+- [x] write tests: custom + predefined screen responses from fixtures
+- [x] run `rtk ./mvnw verify` - must pass before next task
 
 ### Task 20: Sector, Industry, Market
 

@@ -5,6 +5,7 @@ import io.andreygrigoriev.yfin.exception.YFDownloadException;
 import io.andreygrigoriev.yfin.exception.YFTransportException;
 import io.andreygrigoriev.yfin.exception.YFinanceException;
 import io.andreygrigoriev.yfin.internal.cache.FileCache;
+import io.andreygrigoriev.yfin.internal.endpoint.screener.ScreenerEndpoint;
 import io.andreygrigoriev.yfin.internal.endpoint.search.LookupEndpoint;
 import io.andreygrigoriev.yfin.internal.endpoint.search.SearchEndpoint;
 import io.andreygrigoriev.yfin.internal.http.JdkTransport;
@@ -14,8 +15,10 @@ import io.andreygrigoriev.yfin.internal.http.YahooJson;
 import io.andreygrigoriev.yfin.internal.http.YahooSession;
 import io.andreygrigoriev.yfin.model.LookupResult;
 import io.andreygrigoriev.yfin.model.PriceHistory;
+import io.andreygrigoriev.yfin.model.ScreenerResult;
 import io.andreygrigoriev.yfin.model.SearchResult;
 import io.andreygrigoriev.yfin.request.HistoryRequest;
+import io.andreygrigoriev.yfin.request.ScreenerQuery;
 import io.andreygrigoriev.yfin.spi.Cache;
 import io.andreygrigoriev.yfin.spi.Transport;
 import java.net.ProxySelector;
@@ -222,6 +225,39 @@ public final class YFinance implements AutoCloseable {
     public List<LookupResult> lookup(Lookup lookup) {
         ensureOpen();
         return new LookupEndpoint(session()).lookup(Objects.requireNonNull(lookup, "lookup"));
+    }
+
+    /**
+     * Runs custom screen {@code query} with yfinance's defaults: the first {@value
+     * Screener#DEFAULT_SIZE} results, sorted by ticker descending.
+     *
+     * @throws IllegalStateException when the client is closed
+     */
+    public ScreenerResult screen(ScreenerQuery query) {
+        return screen(Screener.of(query));
+    }
+
+    /**
+     * Runs Yahoo's predefined screen {@code name}, e.g. {@code day_gainers}, {@code most_actives};
+     * see {@link Screener#predefinedNames()}.
+     *
+     * @throws IllegalArgumentException when {@code name} is blank
+     * @throws IllegalStateException when the client is closed
+     */
+    public ScreenerResult screen(String name) {
+        return screen(Screener.predefined(name));
+    }
+
+    /**
+     * Runs {@code screener} (yfinance {@code screen}).
+     *
+     * @throws IllegalArgumentException when a predefined screen with an offset is not one of
+     *     {@link Screener#predefinedNames()}
+     * @throws IllegalStateException when the client is closed
+     */
+    public ScreenerResult screen(Screener screener) {
+        ensureOpen();
+        return new ScreenerEndpoint(session()).screen(Objects.requireNonNull(screener, "screener"));
     }
 
     private static YFinanceException asYFinanceException(String symbol, Throwable cause) {

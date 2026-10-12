@@ -1,0 +1,1 @@
+{"finance":{"result":null,"error":{"code":"internal-error","description":"Unsupported operator: FOO; Supported operators are :[gtelt, or, btwn, lt, has_parent, match_any, eq, nested, gt, match_phrase, date_hist, and, must_not, match_all, gte, has_child, lte]"}}}
