@@ -3,6 +3,8 @@ package io.andreygrigoriev.yfin;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.andreygrigoriev.yfin.internal.endpoint.chart.ChartEndpoint;
 import io.andreygrigoriev.yfin.internal.endpoint.earnings.EarningsDatesEndpoint;
+import io.andreygrigoriev.yfin.internal.endpoint.isin.IsinEndpoint;
+import io.andreygrigoriev.yfin.internal.endpoint.news.NewsEndpoint;
 import io.andreygrigoriev.yfin.internal.endpoint.options.OptionsEndpoint;
 import io.andreygrigoriev.yfin.internal.endpoint.quote.QuoteEndpoint;
 import io.andreygrigoriev.yfin.internal.endpoint.quotesummary.AnalystMapper;
@@ -12,6 +14,7 @@ import io.andreygrigoriev.yfin.internal.endpoint.quotesummary.InfoMapper;
 import io.andreygrigoriev.yfin.internal.endpoint.quotesummary.QuoteSummaryEndpoint;
 import io.andreygrigoriev.yfin.internal.endpoint.quotesummary.QuoteSummaryModule;
 import io.andreygrigoriev.yfin.internal.endpoint.quotesummary.SustainabilityMapper;
+import io.andreygrigoriev.yfin.internal.endpoint.shares.SharesEndpoint;
 import io.andreygrigoriev.yfin.internal.endpoint.timeseries.StatementKeys;
 import io.andreygrigoriev.yfin.internal.endpoint.timeseries.TimeseriesEndpoint;
 import io.andreygrigoriev.yfin.internal.http.YahooJson;
@@ -33,11 +36,13 @@ import io.andreygrigoriev.yfin.model.InsiderPurchases;
 import io.andreygrigoriev.yfin.model.InsiderRosterEntry;
 import io.andreygrigoriev.yfin.model.InsiderTransaction;
 import io.andreygrigoriev.yfin.model.MajorHolders;
+import io.andreygrigoriev.yfin.model.NewsItem;
 import io.andreygrigoriev.yfin.model.OptionChain;
 import io.andreygrigoriev.yfin.model.PriceHistory;
 import io.andreygrigoriev.yfin.model.PriceTargets;
 import io.andreygrigoriev.yfin.model.Recommendation;
 import io.andreygrigoriev.yfin.model.RevenueEstimate;
+import io.andreygrigoriev.yfin.model.SharesCount;
 import io.andreygrigoriev.yfin.model.Split;
 import io.andreygrigoriev.yfin.model.Sustainability;
 import io.andreygrigoriev.yfin.model.TickerInfo;
@@ -45,6 +50,7 @@ import io.andreygrigoriev.yfin.model.UpgradeDowngrade;
 import io.andreygrigoriev.yfin.request.Frequency;
 import io.andreygrigoriev.yfin.request.HistoryRequest;
 import io.andreygrigoriev.yfin.request.Interval;
+import io.andreygrigoriev.yfin.request.NewsTab;
 import io.andreygrigoriev.yfin.request.Period;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -358,6 +364,61 @@ public final class Ticker {
      */
     public FinancialStatement cashFlow(Frequency frequency) {
         return statement(StatementKeys.CASH_FLOW, frequency);
+    }
+
+    /** {@link #news(int, NewsTab)} with yfinance's defaults: 10 articles of {@link NewsTab#NEWS}. */
+    public List<NewsItem> news() {
+        return news(10, NewsTab.NEWS);
+    }
+
+    /**
+     * Up to {@code count} news articles from {@code tab} (yfinance {@code get_news}), newest
+     * first; empty when Yahoo has none. Falls back to the search endpoint's news when Yahoo's news
+     * stream endpoint is unavailable, which has no press releases.
+     *
+     * @throws IllegalArgumentException when {@code count} is not positive
+     */
+    public List<NewsItem> news(int count, NewsTab tab) {
+        Objects.requireNonNull(tab, "tab");
+        return new NewsEndpoint(client.session()).news(symbol, count, tab);
+    }
+
+    /** {@link #sharesFull(LocalDate, LocalDate)} over the last 18 months. */
+    public List<SharesCount> sharesFull() {
+        return sharesFull(null, null);
+    }
+
+    /**
+     * Shares outstanding as reported from {@code start} (inclusive) to {@code end} (exclusive),
+     * oldest first (yfinance {@code get_shares_full}); Yahoo may report several counts per day.
+     * Empty when Yahoo has none, e.g. for crypto or an ETF. May take one extra chart request for
+     * the exchange timezone when it is not cached.
+     *
+     * @param start first day, or {@code null} for 548 days before {@code end}
+     * @param end day after the last one, or {@code null} for today
+     * @throws IllegalArgumentException when {@code start} is not before {@code end}
+     */
+    public List<SharesCount> sharesFull(@Nullable LocalDate start, @Nullable LocalDate end) {
+        return new SharesEndpoint(client.session(), chart()::timezone).sharesFull(symbol, start, end);
+    }
+
+    /**
+     * The ISIN (yfinance's experimental {@code isin}), looked up on Business Insider by the
+     * symbol's short name and cached in the {@code isin} cache namespace. Empty for symbols that
+     * are not equities or funds (containing {@code -} or {@code ^}), when the lookup finds none
+     * (yfinance's {@code "-"}), or when Yahoo has no quote for the symbol. Like yfinance, the
+     * lookup is heuristic and may pick the ISIN of a related listing.
+     */
+    public Optional<String> isin() {
+        return new IsinEndpoint(
+                        client.session(),
+                        client.cache(),
+                        s -> new QuoteEndpoint(client.session())
+                                .quote(s)
+                                .map(q -> q.path("shortName").asText("").isEmpty()
+                                        ? s
+                                        : q.path("shortName").asText()))
+                .isin(symbol);
     }
 
     YFinance client() {

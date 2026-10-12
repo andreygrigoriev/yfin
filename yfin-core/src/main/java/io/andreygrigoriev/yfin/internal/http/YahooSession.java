@@ -152,6 +152,15 @@ public final class YahooSession {
         return response;
     }
 
+    /**
+     * Sends {@code request} through the retry policy and the limiter without a crumb, for
+     * non-Yahoo hosts that must not see the Yahoo session. Only cookies matching the request's
+     * host are sent.
+     */
+    public HttpResponse executeWithoutCrumb(HttpRequest request) {
+        return send(request);
+    }
+
     /** The current crumb, fetching one (single-flight) when there is none. */
     public String crumb() {
         String current = crumb;

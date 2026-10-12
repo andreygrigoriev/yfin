@@ -429,13 +429,15 @@ YFinanceException (RuntimeException)
 - Create: `yfin-core/src/main/java/io/andreygrigoriev/yfin/internal/endpoint/{news/NewsEndpoint,shares/SharesEndpoint,isin/IsinEndpoint}.java`
 - Modify: `Ticker.java`
 - Create: fixtures + tests per endpoint
+- ➕ Create: `request/NewsTab.java`, `internal/endpoint/{news,shares,isin}/package-info.java`, `YahooSession.executeWithoutCrumb` (third-party host must not see the crumb); fixtures `fixtures/{news,shares,isin}/…` + `quote/sap-de.json`, recorded live 2026-10-12 (curl_cffi via yfinance `YfData`), except `news/*-ncp-synthetic.json`
+- ⚠️ yfinance 1.7.0's news endpoint (`POST finance.yahoo.com/xhr/ncp`) answers 404 as of 2026-10-12 (yfinance itself returns `[]`); the ncp shape is covered by synthetic fixtures only. On 404 `news()` falls back to `/v1/finance/search` news (no press releases: `PRESS_RELEASES` → empty). `isin()` returns `Optional<String>` (empty = yfinance `-`/`None`), consistent with other `Ticker` accessors; results incl. "none" persisted in the `isin` cache namespace (yfinance keeps it per instance). `sharesFull(start, end)`: `end` exclusive, either may be `null` (yfinance defaults: 18 months up to now); `SharesCount(ZonedDateTime time, long shares)` with yfinance's localize-not-convert timestamps
 
-- [ ] `Ticker.news(int count, NewsTab tab)` per pinned yfinance (news/press releases/all)
-- [ ] `Ticker.sharesFull(LocalDate start, LocalDate end)` → `List<SharesCount>` (timeseries `shares_out`)
-- [ ] `Ticker.isin()` (cached in `isin` namespace; `null` for non-equities, like yfinance's `-`)
-- [ ] write tests per endpoint with fixtures (happy path)
-- [ ] write tests: empty news, no shares data, ISIN cache hit skips request
-- [ ] run `rtk ./mvnw verify` - must pass before next task
+- [x] `Ticker.news(int count, NewsTab tab)` per pinned yfinance (news/press releases/all)
+- [x] `Ticker.sharesFull(LocalDate start, LocalDate end)` → `List<SharesCount>` (timeseries `shares_out`)
+- [x] `Ticker.isin()` (cached in `isin` namespace; `null` for non-equities, like yfinance's `-`)
+- [x] write tests per endpoint with fixtures (happy path)
+- [x] write tests: empty news, no shares data, ISIN cache hit skips request
+- [x] run `rtk ./mvnw verify` - must pass before next task
 
 ### Task 17: Bulk download and Tickers (strict)
 
