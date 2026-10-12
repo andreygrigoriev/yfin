@@ -5,12 +5,16 @@ import io.andreygrigoriev.yfin.exception.YFDownloadException;
 import io.andreygrigoriev.yfin.exception.YFTransportException;
 import io.andreygrigoriev.yfin.exception.YFinanceException;
 import io.andreygrigoriev.yfin.internal.cache.FileCache;
+import io.andreygrigoriev.yfin.internal.endpoint.search.LookupEndpoint;
+import io.andreygrigoriev.yfin.internal.endpoint.search.SearchEndpoint;
 import io.andreygrigoriev.yfin.internal.http.JdkTransport;
 import io.andreygrigoriev.yfin.internal.http.RequestLimiter;
 import io.andreygrigoriev.yfin.internal.http.RetryPolicy;
 import io.andreygrigoriev.yfin.internal.http.YahooJson;
 import io.andreygrigoriev.yfin.internal.http.YahooSession;
+import io.andreygrigoriev.yfin.model.LookupResult;
 import io.andreygrigoriev.yfin.model.PriceHistory;
+import io.andreygrigoriev.yfin.model.SearchResult;
 import io.andreygrigoriev.yfin.request.HistoryRequest;
 import io.andreygrigoriev.yfin.spi.Cache;
 import io.andreygrigoriev.yfin.spi.Transport;
@@ -175,6 +179,49 @@ public final class YFinance implements AutoCloseable {
             throw new YFDownloadException(failures, results);
         }
         return Collections.unmodifiableMap(results);
+    }
+
+    /**
+     * Searches Yahoo Finance for {@code query} (a symbol or company name) with yfinance's default
+     * options; see {@link Search}.
+     *
+     * @throws IllegalArgumentException when {@code query} is blank
+     * @throws IllegalStateException when the client is closed
+     */
+    public SearchResult search(String query) {
+        return search(Search.of(query));
+    }
+
+    /**
+     * Runs {@code search} (yfinance {@code Search}): quotes, news, lists, research reports and
+     * navigation links. Categories Yahoo has nothing for are empty.
+     *
+     * @throws IllegalStateException when the client is closed
+     */
+    public SearchResult search(Search search) {
+        ensureOpen();
+        return new SearchEndpoint(session()).search(Objects.requireNonNull(search, "search"));
+    }
+
+    /**
+     * Instruments of every type matching {@code query}, at most {@value Lookup#DEFAULT_COUNT}.
+     *
+     * @throws IllegalArgumentException when {@code query} is blank
+     * @throws IllegalStateException when the client is closed
+     */
+    public List<LookupResult> lookup(String query) {
+        return lookup(Lookup.of(query));
+    }
+
+    /**
+     * Runs {@code lookup} (yfinance {@code Lookup.get_*}), in Yahoo's order; empty when nothing
+     * matches.
+     *
+     * @throws IllegalStateException when the client is closed
+     */
+    public List<LookupResult> lookup(Lookup lookup) {
+        ensureOpen();
+        return new LookupEndpoint(session()).lookup(Objects.requireNonNull(lookup, "lookup"));
     }
 
     private static YFinanceException asYFinanceException(String symbol, Throwable cause) {

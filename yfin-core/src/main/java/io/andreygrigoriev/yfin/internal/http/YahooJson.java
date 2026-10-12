@@ -9,6 +9,7 @@ import io.andreygrigoriev.yfin.exception.YFDataException;
 import io.andreygrigoriev.yfin.exception.YFSymbolNotFoundException;
 import io.andreygrigoriev.yfin.spi.HttpResponse;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -30,6 +31,8 @@ public final class YahooJson {
     private static final ObjectMapper MAPPER = new ObjectMapper()
             .registerModule(new JavaTimeModule())
             .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+
+    private static final String DOWN_MARKER = "Will be right back";
 
     private YahooJson() {}
 
@@ -65,6 +68,19 @@ public final class YahooJson {
             throw new YFDataException("HTTP " + response.status(), body, null);
         }
         return root;
+    }
+
+    /**
+     * Throws when {@code response} is Yahoo's "Will be right back" outage page.
+     *
+     * @throws YFDataException when Yahoo Finance is down
+     */
+    public static void checkNotDown(HttpResponse response) {
+        byte[] body = response.body();
+        String head = new String(body, 0, Math.min(body.length, 4096), StandardCharsets.UTF_8);
+        if (head.contains(DOWN_MARKER)) {
+            throw new YFDataException("Yahoo Finance is currently down", body, null);
+        }
     }
 
     private static void checkErrorEnvelope(JsonNode root, @Nullable String symbol, byte[] body) {

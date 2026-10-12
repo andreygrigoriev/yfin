@@ -462,12 +462,14 @@ YFinanceException (RuntimeException)
 - Create: `yfin-core/src/main/java/io/andreygrigoriev/yfin/model/{SearchResult,SearchQuote,LookupResult}.java`
 - Create: `yfin-core/src/main/java/io/andreygrigoriev/yfin/internal/endpoint/search/{SearchEndpoint,LookupEndpoint}.java`
 - Create: fixtures + tests
+- ➕ Create: `yfin-core/src/main/java/io/andreygrigoriev/yfin/request/LookupType.java` (like `NewsTab`)
+- ⚠️ `Search` and `Lookup` are immutable option objects with withers (`Search.of("apple").maxResults(3)`), run by `yf.search(String|Search)` → `SearchResult` and `yf.lookup(String|Lookup)` → `List<LookupResult>`; one request per call (yfinance `Search` fetches in its constructor, `Lookup` caches per instance). `SearchResult` has typed `quotes` (entries without symbol dropped, as yfinance) and `news` (`NewsItem`, parsed like the news fallback), while `lists`, `research`, `nav` stay `List<Map<String, Object>>` plus `raw()`. Lookup type `STOCK` = Yahoo `equity`. Booleans are sent lower-case (`requests` sends `True`/`False`). The outage check moved to `YahooJson.checkNotDown`. Fixtures recorded live 2026-10-12 (yfinance 1.7.0 parameters)
 
-- [ ] `yf.search(query)` with options (maxResults, newsCount, listsCount, fuzzy, includeResearch, …) → quotes, news, lists, research, nav
-- [ ] `yf.lookup(query)` with type filter (all, stock, mutualfund, etf, index, future, currency, cryptocurrency) and count
-- [ ] write tests per endpoint with fixtures
-- [ ] write tests: empty results, blank query → `IllegalArgumentException`
-- [ ] run `rtk ./mvnw verify` - must pass before next task
+- [x] `yf.search(query)` with options (maxResults, newsCount, listsCount, fuzzy, includeResearch, …) → quotes, news, lists, research, nav
+- [x] `yf.lookup(query)` with type filter (all, stock, mutualfund, etf, index, future, currency, cryptocurrency) and count
+- [x] write tests per endpoint with fixtures
+- [x] write tests: empty results, blank query → `IllegalArgumentException`
+- [x] run `rtk ./mvnw verify` - must pass before next task
 
 ### Task 19: Screener and EquityQuery/FundQuery
 

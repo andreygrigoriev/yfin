@@ -10,7 +10,6 @@ import io.andreygrigoriev.yfin.model.NewsItem;
 import io.andreygrigoriev.yfin.request.NewsTab;
 import io.andreygrigoriev.yfin.spi.HttpRequest;
 import io.andreygrigoriev.yfin.spi.HttpResponse;
-import java.nio.charset.StandardCharsets;
 import java.time.DateTimeException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -37,7 +36,6 @@ public final class NewsEndpoint {
 
     static final String NCP_URL = "https://finance.yahoo.com/xhr/ncp";
     static final String SEARCH_URL = "https://query2.finance.yahoo.com/v1/finance/search";
-    private static final String DOWN_MARKER = "Will be right back";
 
     private final YahooSession session;
 
@@ -68,7 +66,7 @@ public final class NewsEndpoint {
             LOG.debug("{}: news endpoint answered 404, falling back to search", symbol);
             return tab == NewsTab.PRESS_RELEASES ? List.of() : searchNews(symbol, count);
         }
-        checkNotDown(response);
+        YahooJson.checkNotDown(response);
         return parseStream(YahooJson.read(response, null));
     }
 
@@ -81,7 +79,7 @@ public final class NewsEndpoint {
         HttpRequest request = HttpRequest.get(Uris.uri(SEARCH_URL, params));
         LOG.debug("{}: GET {}", symbol, request.uri());
         HttpResponse response = session.execute(request);
-        checkNotDown(response);
+        YahooJson.checkNotDown(response);
         List<NewsItem> items = parseSearch(YahooJson.read(response, null));
         return items.size() > count ? items.subList(0, count) : items;
     }
@@ -92,14 +90,6 @@ public final class NewsEndpoint {
         config.put("snippetCount", count);
         config.putArray("s").add(symbol);
         return body.toString();
-    }
-
-    private static void checkNotDown(HttpResponse response) {
-        byte[] body = response.body();
-        String head = new String(body, 0, Math.min(body.length, 4096), StandardCharsets.UTF_8);
-        if (head.contains(DOWN_MARKER)) {
-            throw new YFDataException("Yahoo Finance is currently down", body, null);
-        }
     }
 
     /** Articles of an {@code xhr/ncp} response, ads dropped. */
@@ -148,7 +138,7 @@ public final class NewsEndpoint {
     }
 
     /** Articles of a {@code /v1/finance/search} response. */
-    static List<NewsItem> parseSearch(JsonNode root) {
+    public static List<NewsItem> parseSearch(JsonNode root) {
         JsonNode news = root.path("news");
         if (news.isMissingNode() || news.isNull()) {
             return List.of();
