@@ -18,6 +18,7 @@ import io.andreygrigoriev.yfin.model.PriceHistory;
 import io.andreygrigoriev.yfin.model.ScreenerResult;
 import io.andreygrigoriev.yfin.model.SearchResult;
 import io.andreygrigoriev.yfin.request.HistoryRequest;
+import io.andreygrigoriev.yfin.request.MarketRegion;
 import io.andreygrigoriev.yfin.request.ScreenerQuery;
 import io.andreygrigoriev.yfin.spi.Cache;
 import io.andreygrigoriev.yfin.spi.Transport;
@@ -258,6 +259,92 @@ public final class YFinance implements AutoCloseable {
     public ScreenerResult screen(Screener screener) {
         ensureOpen();
         return new ScreenerEndpoint(session()).screen(Objects.requireNonNull(screener, "screener"));
+    }
+
+    /** Default region of {@link #sector(String)} and {@link #industry(String)}. */
+    public static final String DEFAULT_REGION = "US";
+
+    /**
+     * Handle for sector {@code key} (e.g. {@code technology}), trimmed and lower-cased, with
+     * listings for the {@value #DEFAULT_REGION} region. No request is made.
+     *
+     * @throws IllegalArgumentException when {@code key} is blank
+     * @throws IllegalStateException when the client is closed
+     */
+    public Sector sector(String key) {
+        return sector(key, DEFAULT_REGION);
+    }
+
+    /**
+     * Handle for sector {@code key} with top companies, ETFs and funds scoped to {@code region}
+     * (ISO 3166-1 alpha-2, e.g. {@code GB}). No request is made.
+     *
+     * @throws IllegalArgumentException when {@code key} or {@code region} is blank
+     * @throws IllegalStateException when the client is closed
+     */
+    public Sector sector(String key, String region) {
+        ensureOpen();
+        return new Sector(this, normalizeKey(key), normalizeRegion(region));
+    }
+
+    /**
+     * Handle for industry {@code key} (e.g. {@code semiconductors}), trimmed and lower-cased, with
+     * listings for the {@value #DEFAULT_REGION} region. No request is made.
+     *
+     * @throws IllegalArgumentException when {@code key} is blank
+     * @throws IllegalStateException when the client is closed
+     */
+    public Industry industry(String key) {
+        return industry(key, DEFAULT_REGION);
+    }
+
+    /**
+     * Handle for industry {@code key} with company listings scoped to {@code region} (ISO 3166-1
+     * alpha-2). No request is made.
+     *
+     * @throws IllegalArgumentException when {@code key} or {@code region} is blank
+     * @throws IllegalStateException when the client is closed
+     */
+    public Industry industry(String key, String region) {
+        ensureOpen();
+        return new Industry(this, normalizeKey(key), normalizeRegion(region));
+    }
+
+    /**
+     * Handle for market {@code region}. No request is made.
+     *
+     * @throws IllegalStateException when the client is closed
+     */
+    public Market market(MarketRegion region) {
+        ensureOpen();
+        return new Market(this, Objects.requireNonNull(region, "region"));
+    }
+
+    /**
+     * Handle for the market named {@code region}, e.g. {@code US}, {@code EUROPE}; see {@link
+     * MarketRegion}. No request is made.
+     *
+     * @throws IllegalArgumentException when {@code region} is not a {@link MarketRegion}
+     * @throws IllegalStateException when the client is closed
+     */
+    public Market market(String region) {
+        return market(MarketRegion.of(region));
+    }
+
+    private static String normalizeKey(String key) {
+        String k = Objects.requireNonNull(key, "key").trim();
+        if (k.isEmpty()) {
+            throw new IllegalArgumentException("key is blank");
+        }
+        return k.toLowerCase(Locale.ROOT);
+    }
+
+    private static String normalizeRegion(String region) {
+        String r = Objects.requireNonNull(region, "region").trim();
+        if (r.isEmpty()) {
+            throw new IllegalArgumentException("region is blank");
+        }
+        return r.toUpperCase(Locale.ROOT);
     }
 
     private static YFinanceException asYFinanceException(String symbol, Throwable cause) {

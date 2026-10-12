@@ -495,13 +495,14 @@ YFinanceException (RuntimeException)
 - Create: `yfin-core/src/main/java/io/andreygrigoriev/yfin/model/{SectorOverview,IndustryOverview,MarketStatus,MarketSummaryItem,…}.java`
 - Create: `yfin-core/src/main/java/io/andreygrigoriev/yfin/internal/endpoint/domain/{SectorEndpoint,IndustryEndpoint,MarketEndpoint}.java`
 - Create: fixtures + tests
+- ⚠️ Models are `SectorData`/`IndustryData` (one request's worth of data) plus shared `DomainOverview`, `TopCompany`, `SectorIndustry`, `PerformingCompany`, `GrowthCompany`, `MarketStatus`, `MarketSummaryItem`; `request/MarketRegion` enum (yfinance `MarketRegion`). `Sector`/`Industry`/`Market` are handles from `yf.sector(key[, region])`, `yf.industry(key[, region])`, `yf.market(MarketRegion|String)`; like yfinance they fetch once on first access (memoized, retried after a failure). Unknown keys: Yahoo answers 404 with an HTML page → `YFSymbolNotFoundException`. `Market.summary()` is a list (yfinance keys by exchange and loses instruments sharing one); `Market.status()` is empty for non-US regions (Yahoo's markettime endpoint always answers for the U.S.). Fixtures recorded live 2026-10-12
 
-- [ ] `Sector`: overview, topCompanies, topEtfs, topMutualFunds, industries, researchReports
-- [ ] `Industry`: overview, topCompanies, topPerformingCompanies, topGrowthCompanies, sectorKey/name
-- [ ] `Market` (region, e.g. `US`): status (open/close times, timezone) and summary
-- [ ] write tests per class with fixtures
-- [ ] write tests: unknown sector/industry key → `YFSymbolNotFoundException`
-- [ ] run `rtk ./mvnw verify` - must pass before next task
+- [x] `Sector`: overview, topCompanies, topEtfs, topMutualFunds, industries, researchReports
+- [x] `Industry`: overview, topCompanies, topPerformingCompanies, topGrowthCompanies, sectorKey/name
+- [x] `Market` (region, e.g. `US`): status (open/close times, timezone) and summary
+- [x] write tests per class with fixtures
+- [x] write tests: unknown sector/industry key → `YFSymbolNotFoundException`
+- [x] run `rtk ./mvnw verify` - must pass before next task
 
 ### Task 21: Price repair
 
