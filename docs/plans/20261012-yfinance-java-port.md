@@ -272,13 +272,14 @@ YFinanceException (RuntimeException)
 - Create: `yfin-core/src/main/java/io/andreygrigoriev/yfin/YFinance.java`
 - Create: `yfin-core/src/main/java/io/andreygrigoriev/yfin/Ticker.java` (shell, methods added in later tasks)
 - Create: `yfin-core/src/test/java/io/andreygrigoriev/yfin/YFinanceTest.java`
+- ➕ Delete: `yfin-core/src/main/java/io/andreygrigoriev/yfin/Placeholder.java` (package now has real types)
 
-- [ ] builder with all config options from Technical Details; validate inputs (positive timeouts/concurrency, non-negative retries)
-- [ ] `create()` shortcut with defaults; `close()` shuts down transport/executor, idempotent; calls after close throw `IllegalStateException`
-- [ ] `ticker(String)` normalizes symbol (trim, upper-case) and rejects blank
-- [ ] internal accessor for session/mapper used by endpoints (package-private or via internal package)
-- [ ] write tests: builder defaults, validation errors, custom transport wiring, close semantics
-- [ ] run `rtk ./mvnw verify` - must pass before next task
+- [x] builder with all config options from Technical Details; validate inputs (positive timeouts/concurrency, non-negative retries)
+- [x] `create()` shortcut with defaults; `close()` shuts down transport/executor, idempotent; calls after close throw `IllegalStateException`
+- [x] `ticker(String)` normalizes symbol (trim, upper-case) and rejects blank
+- [x] internal accessor for session/mapper used by endpoints (package-private or via internal package)
+- [x] write tests: builder defaults, validation errors, custom transport wiring, close semantics
+- [x] run `rtk ./mvnw verify` - must pass before next task
 
 ### Task 9: Price history (chart endpoint)
 

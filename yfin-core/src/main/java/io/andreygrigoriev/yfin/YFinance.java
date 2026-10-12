@@ -1,0 +1,301 @@
+package io.andreygrigoriev.yfin;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.andreygrigoriev.yfin.internal.cache.FileCache;
+import io.andreygrigoriev.yfin.internal.http.JdkTransport;
+import io.andreygrigoriev.yfin.internal.http.RequestLimiter;
+import io.andreygrigoriev.yfin.internal.http.RetryPolicy;
+import io.andreygrigoriev.yfin.internal.http.YahooJson;
+import io.andreygrigoriev.yfin.internal.http.YahooSession;
+import io.andreygrigoriev.yfin.spi.Cache;
+import io.andreygrigoriev.yfin.spi.Transport;
+import java.net.ProxySelector;
+import java.nio.file.Path;
+import java.time.Duration;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
+import org.jspecify.annotations.Nullable;
+
+/**
+ * Yahoo Finance client. Holds the HTTP transport, the cookie/crumb session, the request limiter
+ * and the cache; create one per application and share it across threads.
+ *
+ * <pre>{@code
+ * try (YFinance yf = YFinance.create()) {
+ *     Ticker aapl = yf.ticker("AAPL");
+ * }
+ * }</pre>
+ *
+ * <p>Thread-safe. {@link #close()} releases the transport the client created itself; after
+ * closing, every method except {@code close()} throws {@link IllegalStateException}.
+ */
+public final class YFinance implements AutoCloseable {
+
+    /** Default connect timeout. */
+    public static final Duration DEFAULT_CONNECT_TIMEOUT = Duration.ofSeconds(10);
+    /** Default timeout for a single request. */
+    public static final Duration DEFAULT_REQUEST_TIMEOUT = Duration.ofSeconds(30);
+
+    private final Transport transport;
+    private final boolean ownsTransport;
+    private final Cache cache;
+    private final RequestLimiter limiter;
+    private final RetryPolicy retry;
+    private final boolean repair;
+    private final Duration connectTimeout;
+    private final Duration requestTimeout;
+    private final String userAgent;
+    private final AtomicBoolean closed = new AtomicBoolean();
+    private final Object sessionLock = new Object();
+    private volatile @Nullable YahooSession session;
+
+    private YFinance(Builder b) {
+        this.connectTimeout = b.connectTimeout;
+        this.requestTimeout = b.requestTimeout;
+        this.userAgent = b.userAgent;
+        this.repair = b.repair;
+        this.limiter = new RequestLimiter(b.maxConcurrentRequests);
+        this.retry = RetryPolicy.of(b.maxRetries);
+        this.cache = b.cache != null
+                ? b.cache
+                : b.cacheDir != null ? new FileCache(b.cacheDir) : FileCache.atDefaultLocation();
+        if (b.transport != null) {
+            this.transport = b.transport;
+            this.ownsTransport = false;
+        } else {
+            var tb = JdkTransport.builder()
+                    .connectTimeout(b.connectTimeout)
+                    .requestTimeout(b.requestTimeout)
+                    .userAgent(b.userAgent)
+                    .proxy(b.proxy);
+            this.transport = tb.build();
+            this.ownsTransport = true;
+        }
+    }
+
+    /** Client with default settings. */
+    public static YFinance create() {
+        return builder().build();
+    }
+
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    /**
+     * Handle for {@code symbol}, trimmed and upper-cased. No request is made.
+     *
+     * @throws IllegalArgumentException when {@code symbol} is blank
+     * @throws IllegalStateException when the client is closed
+     */
+    public Ticker ticker(String symbol) {
+        ensureOpen();
+        return new Ticker(this, normalizeSymbol(symbol));
+    }
+
+    /** Whether price repair is applied by default. */
+    public boolean repair() {
+        return repair;
+    }
+
+    /**
+     * Closes the transport if this client created it; a transport passed to the builder stays
+     * open and remains the caller's to close. Idempotent.
+     */
+    @Override
+    public void close() {
+        if (closed.compareAndSet(false, true) && ownsTransport && transport instanceof AutoCloseable c) {
+            try {
+                c.close();
+            } catch (Exception e) {
+                throw new IllegalStateException("failed to close transport", e);
+            }
+        }
+    }
+
+    /** Whether {@link #close()} has been called. */
+    public boolean isClosed() {
+        return closed.get();
+    }
+
+    @Override
+    public String toString() {
+        return "YFinance[closed=" + closed.get() + "]";
+    }
+
+    // ---- internal accessors used by Ticker and the endpoints ----
+
+    /** The cookie/crumb session, created on first use. */
+    YahooSession session() {
+        ensureOpen();
+        YahooSession s = session;
+        if (s == null) {
+            synchronized (sessionLock) {
+                s = session;
+                if (s == null) {
+                    s = YahooSession.create(transport, cache, limiter, retry);
+                    session = s;
+                }
+            }
+        }
+        return s;
+    }
+
+    /** The shared JSON mapper. */
+    ObjectMapper mapper() {
+        ensureOpen();
+        return YahooJson.mapper();
+    }
+
+    Cache cache() {
+        ensureOpen();
+        return cache;
+    }
+
+    Transport transport() {
+        return transport;
+    }
+
+    RequestLimiter limiter() {
+        return limiter;
+    }
+
+    RetryPolicy retryPolicy() {
+        return retry;
+    }
+
+    Duration connectTimeout() {
+        return connectTimeout;
+    }
+
+    Duration requestTimeout() {
+        return requestTimeout;
+    }
+
+    String userAgent() {
+        return userAgent;
+    }
+
+    void ensureOpen() {
+        if (closed.get()) {
+            throw new IllegalStateException("YFinance client is closed");
+        }
+    }
+
+    static String normalizeSymbol(String symbol) {
+        String s = Objects.requireNonNull(symbol, "symbol").trim();
+        if (s.isEmpty()) {
+            throw new IllegalArgumentException("symbol is blank");
+        }
+        return s.toUpperCase(Locale.ROOT);
+    }
+
+    /**
+     * Settings for {@link YFinance}. {@code connectTimeout}, {@code requestTimeout}, {@code proxy}
+     * and {@code userAgent} configure the default JDK transport and are ignored when a custom
+     * {@link #transport(Transport)} is set.
+     */
+    public static final class Builder {
+
+        private Duration connectTimeout = DEFAULT_CONNECT_TIMEOUT;
+        private Duration requestTimeout = DEFAULT_REQUEST_TIMEOUT;
+        private @Nullable ProxySelector proxy;
+        private String userAgent = JdkTransport.DEFAULT_USER_AGENT;
+        private int maxRetries = RetryPolicy.DEFAULT_MAX_RETRIES;
+        private int maxConcurrentRequests = RequestLimiter.DEFAULT_MAX_CONCURRENT_REQUESTS;
+        private @Nullable Cache cache;
+        private @Nullable Path cacheDir;
+        private @Nullable Transport transport;
+        private boolean repair;
+
+        private Builder() {}
+
+        /** TCP connect timeout; default 10s. */
+        public Builder connectTimeout(Duration timeout) {
+            this.connectTimeout = positive(timeout, "connectTimeout");
+            return this;
+        }
+
+        /** Timeout for a single request; default 30s. */
+        public Builder requestTimeout(Duration timeout) {
+            this.requestTimeout = positive(timeout, "requestTimeout");
+            return this;
+        }
+
+        /** Proxy selector, or {@code null} for direct connections (default). */
+        public Builder proxy(@Nullable ProxySelector proxy) {
+            this.proxy = proxy;
+            return this;
+        }
+
+        /** User-Agent header; defaults to a current desktop Chrome. */
+        public Builder userAgent(String userAgent) {
+            if (Objects.requireNonNull(userAgent, "userAgent").isBlank()) {
+                throw new IllegalArgumentException("userAgent is blank");
+            }
+            this.userAgent = userAgent;
+            return this;
+        }
+
+        /** Retries on 429/5xx with exponential backoff; default 2, {@code 0} disables. */
+        public Builder maxRetries(int maxRetries) {
+            if (maxRetries < 0) {
+                throw new IllegalArgumentException("maxRetries must be >= 0: " + maxRetries);
+            }
+            this.maxRetries = maxRetries;
+            return this;
+        }
+
+        /** Upper bound on requests in flight at once; default 8. */
+        public Builder maxConcurrentRequests(int maxConcurrentRequests) {
+            if (maxConcurrentRequests < 1) {
+                throw new IllegalArgumentException("maxConcurrentRequests must be >= 1: " + maxConcurrentRequests);
+            }
+            this.maxConcurrentRequests = maxConcurrentRequests;
+            return this;
+        }
+
+        /**
+         * Cache for timezones, cookies and ISIN lookups; {@link Cache#none()} disables caching.
+         * Replaces any {@link #cacheDir(Path)} setting. Default: a file cache in {@code
+         * $XDG_CACHE_HOME/yfin} or {@code ~/.cache/yfin}.
+         */
+        public Builder cache(Cache cache) {
+            this.cache = Objects.requireNonNull(cache, "cache");
+            this.cacheDir = null;
+            return this;
+        }
+
+        /** File cache in {@code dir}. Replaces any {@link #cache(Cache)} setting. */
+        public Builder cacheDir(Path dir) {
+            this.cacheDir = Objects.requireNonNull(dir, "dir");
+            this.cache = null;
+            return this;
+        }
+
+        /** Custom transport. The client does not close it. */
+        public Builder transport(Transport transport) {
+            this.transport = Objects.requireNonNull(transport, "transport");
+            return this;
+        }
+
+        /** Whether price history requests repair bad prices by default; default {@code false}. */
+        public Builder repair(boolean repair) {
+            this.repair = repair;
+            return this;
+        }
+
+        public YFinance build() {
+            return new YFinance(this);
+        }
+
+        private static Duration positive(Duration d, String name) {
+            Objects.requireNonNull(d, name);
+            if (d.isNegative() || d.isZero()) {
+                throw new IllegalArgumentException(name + " must be positive: " + d);
+            }
+            return d;
+        }
+    }
+}
