@@ -230,12 +230,12 @@ YFinanceException (RuntimeException)
 - Create: `yfin-core/src/main/java/io/andreygrigoriev/yfin/internal/http/{RetryPolicy,RequestLimiter}.java`
 - Create: `yfin-core/src/test/java/io/andreygrigoriev/yfin/internal/http/{RetryPolicyTest,RequestLimiterTest}.java`
 
-- [ ] `RetryPolicy`: retry on 429/5xx/transport error, exponential backoff + full jitter, injectable sleeper/clock for tests; honor `Retry-After` header if present
-- [ ] after exhaustion: 429 → `YFRateLimitException`, else `YFTransportException`
-- [ ] `RequestLimiter`: fair semaphore with `maxConcurrentRequests`; interruptible acquire
-- [ ] write tests: success after N retries, exhaustion mapping, Retry-After honored, 4xx (non-429) not retried
-- [ ] write tests: limiter never exceeds permit count under 100 virtual threads
-- [ ] run `rtk ./mvnw verify` - must pass before next task
+- [x] `RetryPolicy`: retry on 429/5xx/transport error, exponential backoff + full jitter, injectable sleeper/clock for tests; honor `Retry-After` header if present
+- [x] after exhaustion: 429 → `YFRateLimitException`, else `YFTransportException`
+- [x] `RequestLimiter`: fair semaphore with `maxConcurrentRequests`; interruptible acquire
+- [x] write tests: success after N retries, exhaustion mapping, Retry-After honored, 4xx (non-429) not retried
+- [x] write tests: limiter never exceeds permit count under 100 virtual threads
+- [x] run `rtk ./mvnw verify` - must pass before next task
 
 ### Task 6: Cache implementations
 
