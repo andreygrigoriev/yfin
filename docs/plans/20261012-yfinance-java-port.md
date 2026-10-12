@@ -243,12 +243,12 @@ YFinanceException (RuntimeException)
 - Create: `yfin-core/src/main/java/io/andreygrigoriev/yfin/internal/cache/{FileCache,NoCache}.java`
 - Create: `yfin-core/src/test/java/io/andreygrigoriev/yfin/internal/cache/FileCacheTest.java`
 
-- [ ] `FileCache`: one JSON file per namespace under cache dir, in-memory map loaded lazily, atomic write (temp + `ATOMIC_MOVE`), thread-safe
-- [ ] default dir resolution: `$XDG_CACHE_HOME/yfin` else `~/.cache/yfin`; create on first write; unreadable/corrupt file → log warn + start empty
+- [x] `FileCache`: one JSON file per namespace under cache dir, in-memory map loaded lazily, atomic write (temp + `ATOMIC_MOVE`), thread-safe
+- [x] default dir resolution: `$XDG_CACHE_HOME/yfin` else `~/.cache/yfin`; create on first write; unreadable/corrupt file → log warn + start empty
 - [x] `NoCache` singleton behind `Cache.none()` (done in Task 3, needed by `Cache.none()`)
-- [ ] write tests: put/get/invalidate, persistence across instances (`@TempDir`), corrupt file recovery
-- [ ] write tests: concurrent puts from many threads don't corrupt file
-- [ ] run `rtk ./mvnw verify` - must pass before next task
+- [x] write tests: put/get/invalidate, persistence across instances (`@TempDir`), corrupt file recovery
+- [x] write tests: concurrent puts from many threads don't corrupt file
+- [x] run `rtk ./mvnw verify` - must pass before next task
 
 ### Task 7: YahooSession (cookie/crumb auth)
 
