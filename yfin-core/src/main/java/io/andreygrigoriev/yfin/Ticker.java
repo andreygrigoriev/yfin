@@ -10,6 +10,8 @@ import io.andreygrigoriev.yfin.internal.endpoint.quotesummary.InfoMapper;
 import io.andreygrigoriev.yfin.internal.endpoint.quotesummary.QuoteSummaryEndpoint;
 import io.andreygrigoriev.yfin.internal.endpoint.quotesummary.QuoteSummaryModule;
 import io.andreygrigoriev.yfin.internal.endpoint.quotesummary.SustainabilityMapper;
+import io.andreygrigoriev.yfin.internal.endpoint.timeseries.StatementKeys;
+import io.andreygrigoriev.yfin.internal.endpoint.timeseries.TimeseriesEndpoint;
 import io.andreygrigoriev.yfin.internal.http.YahooJson;
 import io.andreygrigoriev.yfin.model.Actions;
 import io.andreygrigoriev.yfin.model.Calendar;
@@ -20,6 +22,7 @@ import io.andreygrigoriev.yfin.model.EarningsHistoryEntry;
 import io.andreygrigoriev.yfin.model.EpsRevisions;
 import io.andreygrigoriev.yfin.model.EpsTrend;
 import io.andreygrigoriev.yfin.model.FastInfo;
+import io.andreygrigoriev.yfin.model.FinancialStatement;
 import io.andreygrigoriev.yfin.model.GrowthEstimate;
 import io.andreygrigoriev.yfin.model.HistoryMetadata;
 import io.andreygrigoriev.yfin.model.Holder;
@@ -35,6 +38,7 @@ import io.andreygrigoriev.yfin.model.Split;
 import io.andreygrigoriev.yfin.model.Sustainability;
 import io.andreygrigoriev.yfin.model.TickerInfo;
 import io.andreygrigoriev.yfin.model.UpgradeDowngrade;
+import io.andreygrigoriev.yfin.request.Frequency;
 import io.andreygrigoriev.yfin.request.HistoryRequest;
 import io.andreygrigoriev.yfin.request.Interval;
 import io.andreygrigoriev.yfin.request.Period;
@@ -279,6 +283,33 @@ public final class Ticker {
         return SustainabilityMapper.sustainability(module(QuoteSummaryModule.ESG_SCORES));
     }
 
+    /**
+     * Income statement (yfinance {@code income_stmt} / {@code financials}); {@link
+     * Frequency#TRAILING} gives the latest trailing twelve months. Empty when Yahoo has no
+     * fundamentals for the symbol, e.g. for an ETF.
+     */
+    public FinancialStatement incomeStatement(Frequency frequency) {
+        return statement(StatementKeys.INCOME, frequency);
+    }
+
+    /**
+     * Balance sheet. Empty when Yahoo has no fundamentals for the symbol.
+     *
+     * @throws IllegalArgumentException for {@link Frequency#TRAILING}, which Yahoo does not offer
+     *     for the balance sheet
+     */
+    public FinancialStatement balanceSheet(Frequency frequency) {
+        return statement(StatementKeys.BALANCE_SHEET, frequency);
+    }
+
+    /**
+     * Cash flow statement; {@link Frequency#TRAILING} gives the latest trailing twelve months.
+     * Empty when Yahoo has no fundamentals for the symbol.
+     */
+    public FinancialStatement cashFlow(Frequency frequency) {
+        return statement(StatementKeys.CASH_FLOW, frequency);
+    }
+
     YFinance client() {
         return client;
     }
@@ -288,6 +319,11 @@ public final class Ticker {
         return new QuoteSummaryEndpoint(client.session())
                 .fetch(symbol, List.of(module))
                 .get(module);
+    }
+
+    private FinancialStatement statement(StatementKeys statement, Frequency frequency) {
+        Objects.requireNonNull(frequency, "frequency");
+        return new TimeseriesEndpoint(client.session()).statement(symbol, statement, frequency);
     }
 
     private ChartEndpoint chart() {

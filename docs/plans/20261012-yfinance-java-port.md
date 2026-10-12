@@ -375,14 +375,18 @@ YFinanceException (RuntimeException)
 - Create: `yfin-core/src/main/java/io/andreygrigoriev/yfin/internal/endpoint/timeseries/{TimeseriesEndpoint,StatementKeys,TimeseriesMapper}.java`
 - Modify: `Ticker.java`
 - Create: fixtures under `fixtures/timeseries/` + `TimeseriesMapperTest`, `FinancialStatementTest`
+- ➕ Create: `internal/endpoint/timeseries/package-info.java`, `TimeseriesEndpointTest` (chunking, params, error envelopes, key lists, `LineItem` constants)
+- ➕ Fixtures `fixtures/timeseries/<symbol>-<frequency>-<statement>-<chunk>.json` (one file per 60-key chunk): AAPL annual/quarterly/trailing income, annual balance sheet, trailing cash flow; JPM annual income and balance sheet; SPY annual income (no data). Recorded live 2026-10-12 (curl_cffi, yfinance 1.7.0 keys and parameters)
+- ⚠️ Always chunked (60 keys per request, like yfinance's fallback mode); yfinance tries one long URL first. Unknown symbols get the same data-less 200 response as ETFs, so they give an empty statement, not `YFSymbolNotFoundException`
+- ⚠️ `StatementKeys` is an enum (`INCOME`, `BALANCE_SHEET`, `CASH_FLOW`) holding the key lists in code (no bundled resource, no native metadata). `FinancialStatement` is a record that also carries `symbol`, `frequency` and `currency` (first `currencyCode` seen), plus `value(LineItem, LocalDate)` and `isEmpty()`; rows contain every period, `NaN` where missing. Line items with no value in any kept period are dropped (yfinance keeps all-NaN rows, which only happens for trailing). `balanceSheet(TRAILING)` throws `IllegalArgumentException`, as yfinance raises `ValueError`. Periods are UTC dates
 
-- [ ] port yfinance's key lists for income, balance sheet, cash flow (`const.py` fundamentals keys) into `StatementKeys`
-- [ ] `TimeseriesEndpoint`: request `annual*`/`quarterly*`/`trailing*` types, chunked to avoid URL length limits
-- [ ] `FinancialStatement` matrix with `periods()`, `get(LineItem|String)`, `lineItems()`; `LineItem` constants for common keys
-- [ ] `Ticker.incomeStatement(Frequency)`, `balanceSheet(Frequency)`, `cashFlow(Frequency)` with `ANNUAL`, `QUARTERLY`, `TRAILING` (TTM where yfinance supports it)
-- [ ] write tests: annual + quarterly + TTM for an equity fixture; values and period ordering
-- [ ] write tests: bank (different line items), symbol with no fundamentals → empty statement
-- [ ] run `rtk ./mvnw verify` - must pass before next task
+- [x] port yfinance's key lists for income, balance sheet, cash flow (`const.py` fundamentals keys) into `StatementKeys`
+- [x] `TimeseriesEndpoint`: request `annual*`/`quarterly*`/`trailing*` types, chunked to avoid URL length limits
+- [x] `FinancialStatement` matrix with `periods()`, `get(LineItem|String)`, `lineItems()`; `LineItem` constants for common keys
+- [x] `Ticker.incomeStatement(Frequency)`, `balanceSheet(Frequency)`, `cashFlow(Frequency)` with `ANNUAL`, `QUARTERLY`, `TRAILING` (TTM where yfinance supports it)
+- [x] write tests: annual + quarterly + TTM for an equity fixture; values and period ordering
+- [x] write tests: bank (different line items), symbol with no fundamentals → empty statement
+- [x] run `rtk ./mvnw verify` - must pass before next task
 
 ### Task 14: Earnings and earnings dates
 
