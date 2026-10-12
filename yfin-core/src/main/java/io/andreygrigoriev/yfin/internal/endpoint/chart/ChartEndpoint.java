@@ -2,6 +2,7 @@ package io.andreygrigoriev.yfin.internal.endpoint.chart;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import io.andreygrigoriev.yfin.exception.YFDataException;
+import io.andreygrigoriev.yfin.internal.endpoint.Uris;
 import io.andreygrigoriev.yfin.internal.http.YahooJson;
 import io.andreygrigoriev.yfin.internal.http.YahooSession;
 import io.andreygrigoriev.yfin.model.HistoryMetadata;
@@ -12,8 +13,6 @@ import io.andreygrigoriev.yfin.request.Period;
 import io.andreygrigoriev.yfin.spi.Cache;
 import io.andreygrigoriev.yfin.spi.HttpRequest;
 import java.net.URI;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.DateTimeException;
 import java.time.Instant;
@@ -24,7 +23,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -175,14 +173,7 @@ public final class ChartEndpoint {
     }
 
     static URI uri(String symbol, Map<String, String> params) {
-        String query = params.entrySet().stream()
-                .map(e -> encode(e.getKey()) + "=" + encode(e.getValue()))
-                .collect(Collectors.joining("&"));
-        return URI.create(BASE_URL + encode(symbol) + (query.isEmpty() ? "" : "?" + query));
-    }
-
-    private static String encode(String s) {
-        return URLEncoder.encode(s, StandardCharsets.UTF_8).replace("+", "%20");
+        return Uris.uri(BASE_URL + Uris.encode(symbol), params);
     }
 
     private void rememberTimezone(String symbol, JsonNode meta) {

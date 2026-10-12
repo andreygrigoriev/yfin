@@ -317,14 +317,18 @@ YFinanceException (RuntimeException)
 - Modify: `yfin-core/src/main/java/io/andreygrigoriev/yfin/Ticker.java`
 - Create: fixtures under `fixtures/quoteSummary/`, `fixtures/quote/`
 - Create: tests `QuoteSummaryEndpointTest`, `TickerInfoTest`, `FastInfoTest`
+- ➕ Create: `yfin-core/src/main/java/io/andreygrigoriev/yfin/internal/endpoint/quotesummary/InfoMapper.java` (yfinance `info` merge/flatten), `internal/endpoint/Uris.java` (shared URI building, `ChartEndpoint` now uses it), package-infos, `QuoteEndpointTest`
+- ➕ Create: chart fixtures `aapl-1d-1y.json`, `aapl-1h-5d-prepost.json`, `btc-usd-1d-1y.json` (fast_info sources); all Task 10 fixtures recorded live 2026-10-12 (curl_cffi, yfinance 1.7.0 parameters)
+- ⚠️ `TickerInfo` is a record `(symbol, raw)` with typed accessor methods reading `raw`, not a 40-component record. `trailingPegRatio` (yfinance fetches it from fundamentals-timeseries) is not added yet: that endpoint arrives with the financials task
+- ⚠️ `FastInfo` is a lazy final class over a public `FastInfo.Source` (year of daily bars, 5d hourly bars, `/v7` quote, clock). `shares` comes from the `/v7` quote `sharesOutstanding` (yfinance uses the fundamentals-timeseries share count); fallbacks for `previousClose`/`regularMarketPreviousClose`/`marketCap` use the quote (yfinance's `_retired_info` fallback is always empty). `FastInfoTest` lives in package `io.andreygrigoriev.yfin` to use the package-private clock hook `Ticker.fastInfo(Supplier<Instant>)`
 
-- [ ] `QuoteSummaryEndpoint`: fetch arbitrary module set, return `JsonNode` per module; unwrap Yahoo `{raw, fmt}` value objects generically
-- [ ] `TickerInfo`: flatten modules the way yfinance `info` does (merge + `/v7/quote` extras); ~40 typed accessors (sector, industry, marketCap, trailingPE, forwardPE, dividendYield, beta, currency, exchange, quoteType, longName, …); `raw()` immutable map
-- [ ] `FastInfo`: lazily computed from history metadata + quote (lastPrice, previousClose, open, dayHigh/Low, yearHigh/Low, fiftyDayAverage, twoHundredDayAverage, marketCap, shares, currency, timezone, exchange, lastVolume, tenDayAverageVolume, threeMonthAverageVolume, yearChange)
-- [ ] `Ticker.info()`, `Ticker.fastInfo()`
-- [ ] write tests: equity, ETF, mutual fund, crypto, index fixtures; missing modules → nulls not exceptions
-- [ ] write tests: not-found symbol and error envelope mapping
-- [ ] run `rtk ./mvnw verify` - must pass before next task
+- [x] `QuoteSummaryEndpoint`: fetch arbitrary module set, return `JsonNode` per module; unwrap Yahoo `{raw, fmt}` value objects generically
+- [x] `TickerInfo`: flatten modules the way yfinance `info` does (merge + `/v7/quote` extras); ~40 typed accessors (sector, industry, marketCap, trailingPE, forwardPE, dividendYield, beta, currency, exchange, quoteType, longName, …); `raw()` immutable map
+- [x] `FastInfo`: lazily computed from history metadata + quote (lastPrice, previousClose, open, dayHigh/Low, yearHigh/Low, fiftyDayAverage, twoHundredDayAverage, marketCap, shares, currency, timezone, exchange, lastVolume, tenDayAverageVolume, threeMonthAverageVolume, yearChange)
+- [x] `Ticker.info()`, `Ticker.fastInfo()`
+- [x] write tests: equity, ETF, mutual fund, crypto, index fixtures; missing modules → nulls not exceptions
+- [x] write tests: not-found symbol and error envelope mapping
+- [x] run `rtk ./mvnw verify` - must pass before next task
 
 ### Task 11: Holders
 

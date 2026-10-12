@@ -1,17 +1,28 @@
 package io.andreygrigoriev.yfin;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import io.andreygrigoriev.yfin.internal.endpoint.chart.ChartEndpoint;
+import io.andreygrigoriev.yfin.internal.endpoint.quote.QuoteEndpoint;
+import io.andreygrigoriev.yfin.internal.endpoint.quotesummary.InfoMapper;
+import io.andreygrigoriev.yfin.internal.endpoint.quotesummary.QuoteSummaryEndpoint;
+import io.andreygrigoriev.yfin.internal.endpoint.quotesummary.QuoteSummaryModule;
+import io.andreygrigoriev.yfin.internal.http.YahooJson;
 import io.andreygrigoriev.yfin.model.Actions;
 import io.andreygrigoriev.yfin.model.CapitalGain;
 import io.andreygrigoriev.yfin.model.Dividend;
+import io.andreygrigoriev.yfin.model.FastInfo;
 import io.andreygrigoriev.yfin.model.HistoryMetadata;
 import io.andreygrigoriev.yfin.model.PriceHistory;
 import io.andreygrigoriev.yfin.model.Split;
+import io.andreygrigoriev.yfin.model.TickerInfo;
 import io.andreygrigoriev.yfin.request.HistoryRequest;
 import io.andreygrigoriev.yfin.request.Interval;
 import io.andreygrigoriev.yfin.request.Period;
+import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.function.Supplier;
 
 /**
  * Data for one symbol. Obtained from {@link YFinance#ticker(String)}; cheap to create, makes no
@@ -27,6 +38,19 @@ public final class Ticker {
             .period(Period.MAX)
             .interval(Interval.ONE_DAY)
             .prepost(true)
+            .build();
+
+    private static final HistoryRequest FAST_INFO_YEAR = HistoryRequest.builder()
+            .period(Period.ONE_YEAR)
+            .interval(Interval.ONE_DAY)
+            .autoAdjust(false)
+            .keepNa(true)
+            .build();
+
+    private static final HistoryRequest FAST_INFO_WEEK_HOURLY = HistoryRequest.builder()
+            .period(Period.FIVE_DAYS)
+            .interval(Interval.ONE_HOUR)
+            .autoAdjust(false)
             .build();
 
     private final YFinance client;
@@ -81,6 +105,62 @@ public final class Ticker {
     /** Chart metadata (exchange, timezone, latest regular-market quote, valid ranges). */
     public HistoryMetadata historyMetadata() {
         return chart().metadata(symbol);
+    }
+
+    /**
+     * Everything Yahoo reports about the symbol (profile, valuation, key statistics, latest quote),
+     * flattened like yfinance's {@code info}. Two requests: {@code quoteSummary} and {@code
+     * /v7/finance/quote}. Fields Yahoo has no data for are absent, never an error.
+     */
+    public TickerInfo info() {
+        Map<QuoteSummaryModule, JsonNode> modules =
+                new QuoteSummaryEndpoint(client.session()).fetch(symbol, InfoMapper.INFO_MODULES);
+        JsonNode quote = new QuoteEndpoint(client.session()).quote(symbol).orElse(null);
+        return InfoMapper.map(symbol, modules, quote);
+    }
+
+    /**
+     * A lazily computed subset of {@link #info()}, like yfinance's {@code fast_info}: mostly from
+     * one year of daily bars. Requests are made on first access to a value that needs them and at
+     * most once per returned instance.
+     */
+    public FastInfo fastInfo() {
+        return fastInfo(Instant::now);
+    }
+
+    /** {@link #fastInfo()} with a custom clock, for tests. */
+    FastInfo fastInfo(Supplier<Instant> clock) {
+        return new FastInfo(new FastInfo.Source() {
+            @Override
+            public PriceHistory yearDaily() {
+                return history(FAST_INFO_YEAR);
+            }
+
+            @Override
+            public PriceHistory weekHourly(boolean prepost) {
+                return history(
+                        FAST_INFO_WEEK_HOURLY.toBuilder().prepost(prepost).build());
+            }
+
+            @Override
+            @SuppressWarnings("unchecked")
+            public Map<String, Object> quote() {
+                return new QuoteEndpoint(client.session())
+                        .quote(symbol)
+                        .map(q -> (Map<String, Object>) YahooJson.toPlain(q))
+                        .orElse(Map.of());
+            }
+
+            @Override
+            public Instant now() {
+                return clock.get();
+            }
+
+            @Override
+            public String toString() {
+                return symbol;
+            }
+        });
     }
 
     YFinance client() {
