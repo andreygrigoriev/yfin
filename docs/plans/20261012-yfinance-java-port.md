@@ -254,16 +254,17 @@ YFinanceException (RuntimeException)
 
 **Files:**
 - Create: `yfin-core/src/main/java/io/andreygrigoriev/yfin/internal/http/YahooSession.java`
+- ➕ Create: `yfin-core/src/main/java/io/andreygrigoriev/yfin/internal/http/YahooJson.java` (shared `ObjectMapper` + error-envelope detection, with `YahooJsonTest`)
 - Create: `yfin-core/src/test/resources/fixtures/session/*`
 - Create: `yfin-core/src/test/java/io/andreygrigoriev/yfin/internal/http/YahooSessionTest.java`
 
-- [ ] basic strategy: `fc.yahoo.com` → cookie, `getcrumb` → crumb; fallback to csrf/consent (`guce.yahoo.com`) strategy when basic fails; remember the working strategy
-- [ ] single-flight crumb acquisition (lock); persist cookie + crumb in cache namespace `cookie`; load on start
-- [ ] `execute(HttpRequest)`: append `crumb` param, go through limiter + retry; on 401 or "Invalid Crumb" body invalidate + refetch once + retry once, then `YFAuthException`
-- [ ] JSON helper: parse body with shared `ObjectMapper`, detect Yahoo error envelopes (`finance.error`, `chart.error`, `quoteSummary.error`) → `YFSymbolNotFoundException` for not-found codes, else `YFDataException`
-- [ ] write tests: happy path, cached crumb reused (no fetch), invalid crumb refresh path, consent fallback, auth failure
-- [ ] write tests: 50 concurrent calls trigger exactly one crumb fetch
-- [ ] run `rtk ./mvnw verify` - must pass before next task
+- [x] basic strategy: `fc.yahoo.com` → cookie, `getcrumb` → crumb; fallback to csrf/consent (`guce.yahoo.com`) strategy when basic fails; remember the working strategy
+- [x] single-flight crumb acquisition (lock); persist cookie + crumb in cache namespace `cookie`; load on start
+- [x] `execute(HttpRequest)`: append `crumb` param, go through limiter + retry; on 401 or "Invalid Crumb" body invalidate + refetch once + retry once, then `YFAuthException`
+- [x] JSON helper: parse body with shared `ObjectMapper`, detect Yahoo error envelopes (`finance.error`, `chart.error`, `quoteSummary.error`) → `YFSymbolNotFoundException` for not-found codes, else `YFDataException`
+- [x] write tests: happy path, cached crumb reused (no fetch), invalid crumb refresh path, consent fallback, auth failure
+- [x] write tests: 50 concurrent calls trigger exactly one crumb fetch
+- [x] run `rtk ./mvnw verify` - must pass before next task
 
 ### Task 8: YFinance client and builder
 
