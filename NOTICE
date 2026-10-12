@@ -1,0 +1,18 @@
+yfin
+Copyright 2026 Andrey Grigoriev
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This product is a Java port of yfinance (https://github.com/ranaroussi/yfinance),
+Copyright Ran Aroussi and contributors, licensed under the Apache License,
+Version 2.0. Reference version: yfinance 1.7.0, tag commit
+3d9d2f0cacb662bff689874cd6113bae3a30a885.
+
+Portions derived from yfinance:
+- ported logic: Yahoo Finance endpoint usage, request parameters, response parsing,
+  session/crumb handling and price repair algorithms
+- vendored Protocol Buffers definition (pricing.proto) used by the live streaming module
+- ported test data (price repair test cases and their CSV data)
+
+yfin is not affiliated with, endorsed by, or vetted by Yahoo, Inc. Yahoo Finance data is
+intended for personal use only; refer to Yahoo's terms of use.

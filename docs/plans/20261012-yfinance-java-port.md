@@ -184,15 +184,15 @@ YFinanceException (RuntimeException)
 - Modify: `.gitignore`
 - Create: `yfin-core/src/test/java/io/andreygrigoriev/yfin/BuildSmokeTest.java`
 
-- [ ] generate Maven wrapper (`mvn wrapper:wrapper`, latest Maven 3.9.x)
-- [ ] parent pom: `dependencyManagement` for Jackson BOM, slf4j, JSpecify, protobuf, tablesaw, dflib, JUnit BOM, AssertJ; `pluginManagement` for compiler (release 25), surefire, failsafe, jar, source, javadoc
-- [ ] add `maven-enforcer-plugin` (requireJavaVersion 25, requireMavenVersion, dependencyConvergence, banDuplicatePomDependencyVersions)
-- [ ] add Spotless with palantir-java-format (`spotless:check` bound to `verify`)
-- [ ] create module poms; `yfin-it` with `maven.deploy.skip`/`skipPublishing`; `-Plive` profile enabling failsafe in `yfin-it`
-- [ ] `module-info.java` for yfin-core (requires Jackson, slf4j, `static org.jspecify`; exports placeholders for public packages)
-- [ ] `LICENSE` Apache 2.0; `NOTICE` crediting yfinance (pinned version/commit) for ported logic, vendored `.proto`, ported test data
-- [ ] write smoke test asserting module descriptor exports only public packages
-- [ ] run `rtk ./mvnw verify` - must pass before next task
+- [x] generate Maven wrapper (`mvn wrapper:wrapper`, latest Maven 3.9.x)
+- [x] parent pom: `dependencyManagement` for Jackson BOM, slf4j, JSpecify, protobuf, tablesaw, dflib, JUnit BOM, AssertJ; `pluginManagement` for compiler (release 25), surefire, failsafe, jar, source, javadoc
+- [x] add `maven-enforcer-plugin` (requireJavaVersion 25, requireMavenVersion, dependencyConvergence, banDuplicatePomDependencyVersions)
+- [x] add Spotless with palantir-java-format (`spotless:check` bound to `verify`)
+- [x] create module poms; `yfin-it` with `maven.deploy.skip`/`skipPublishing`; `-Plive` profile enabling failsafe in `yfin-it`
+- [x] `module-info.java` for yfin-core (requires Jackson, slf4j, `static org.jspecify`; exports placeholders for public packages; each exported package holds a package-private `Placeholder` class until its first real type lands, delete it then)
+- [x] `LICENSE` Apache 2.0; `NOTICE` crediting yfinance (pinned version/commit) for ported logic, vendored `.proto`, ported test data
+- [x] write smoke test asserting module descriptor exports only public packages
+- [x] run `rtk ./mvnw verify` - must pass before next task
 
 ### Task 3: Exceptions, SPI types and test FakeTransport
 
