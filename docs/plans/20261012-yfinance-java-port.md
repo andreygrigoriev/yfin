@@ -203,12 +203,12 @@ YFinanceException (RuntimeException)
 - Modify: `yfin-core/pom.xml` (test-jar goal so other modules can reuse FakeTransport)
 - Create: `yfin-core/src/test/java/io/andreygrigoriev/yfin/testing/FakeTransportTest.java`
 
-- [ ] exception hierarchy per Technical Details; `YFDataException` keeps truncated (≤2KB) payload snippet
-- [ ] `Transport` interface: `HttpResponse send(HttpRequest)`; `HttpRequest` record (method, URI, headers, optional body); `HttpResponse` record (status, headers, body bytes)
-- [ ] `Cache` interface: `Optional<String> get(ns, key)`, `put(ns, key, value)`, `invalidate(ns, key)`, static `none()`
-- [ ] `FakeTransport`: rule-based matching (method + path + query predicate) → fixture file or inline body/status; records received requests; unmatched request fails loudly
-- [ ] write tests for FakeTransport matching, missing-fixture failure, request recording
-- [ ] run `rtk ./mvnw verify` - must pass before next task
+- [x] exception hierarchy per Technical Details; `YFDataException` keeps truncated (≤2KB) payload snippet (`YFDownloadException` deferred to the download task: it needs `PriceHistory`)
+- [x] `Transport` interface: `HttpResponse send(HttpRequest)`; `HttpRequest` record (method, URI, headers, optional body); `HttpResponse` record (status, headers, body bytes)
+- [x] `Cache` interface: `Optional<String> get(ns, key)`, `put(ns, key, value)`, `invalidate(ns, key)`, static `none()` (`none()` backed by `internal.cache.NoCache`, created here)
+- [x] `FakeTransport`: rule-based matching (method + path + query predicate) → fixture file or inline body/status; records received requests; unmatched request fails loudly
+- [x] write tests for FakeTransport matching, missing-fixture failure, request recording
+- [x] run `rtk ./mvnw verify` - must pass before next task
 
 ### Task 4: JdkTransport
 
@@ -245,7 +245,7 @@ YFinanceException (RuntimeException)
 
 - [ ] `FileCache`: one JSON file per namespace under cache dir, in-memory map loaded lazily, atomic write (temp + `ATOMIC_MOVE`), thread-safe
 - [ ] default dir resolution: `$XDG_CACHE_HOME/yfin` else `~/.cache/yfin`; create on first write; unreadable/corrupt file → log warn + start empty
-- [ ] `NoCache` singleton behind `Cache.none()`
+- [x] `NoCache` singleton behind `Cache.none()` (done in Task 3, needed by `Cache.none()`)
 - [ ] write tests: put/get/invalidate, persistence across instances (`@TempDir`), corrupt file recovery
 - [ ] write tests: concurrent puts from many threads don't corrupt file
 - [ ] run `rtk ./mvnw verify` - must pass before next task
