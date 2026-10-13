@@ -615,11 +615,11 @@ YFinanceException (RuntimeException)
 - Modify: `pom.xml` (release profile: source, javadoc, gpg, central-publishing-maven-plugin; SCM, developers, license metadata)
 - Create: `.github/workflows/ci.yml`, `.github/workflows/release.yml`
 
-- [ ] `ci.yml`: on push/PR, Java 25 (Temurin), `./mvnw verify` (unit tests + spotless + enforcer + javadoc lint); second job on GraalVM 25 (`graalvm/setup-graalvm`) running `./mvnw -Pnative test`
-- [ ] `release.yml`: on `v*` tag, set version from tag, `./mvnw -Prelease deploy` to Central Portal, publish GitHub release
-- [ ] parent pom metadata required by Central (name, description, url, licenses, developers, scm)
-- [ ] verify `./mvnw -Prelease package -Dgpg.skip` builds sources + javadoc jars for all published modules
-- [ ] run `rtk ./mvnw verify` - must pass before next task
+- [x] `ci.yml`: on push/PR, Java 25 (Temurin), `./mvnw verify` (unit tests + spotless + enforcer + javadoc lint); second job on GraalVM 25 (`graalvm/setup-graalvm`) running `./mvnw -Pnative test` (javadoc lint = `javadoc-no-fork` bound to `verify` in every build, doclint `all,-missing`, warnings fail)
+- [x] `release.yml`: on `v*` tag, set version from tag, `./mvnw -Prelease deploy` to Central Portal, publish GitHub release (version via `versions-maven-plugin` `versions:set`; central-publishing-maven-plugin 0.8.0 with `autoPublish` + `waitUntil=published`)
+- [x] parent pom metadata required by Central (name, description, url, licenses, developers, scm) (⚠️ no git remote yet: url/scm/issueManagement are marked PLACEHOLDER `github.com/andreygrigoriev/yfin`)
+- [x] verify `./mvnw -Prelease package -Dgpg.skip` builds sources + javadoc jars for all published modules (core, live, tablesaw, dflib; yfin-it skips sources/javadoc/gpg/publishing)
+- [x] run `rtk ./mvnw verify` - must pass before next task
 
 ### Task 28: Verify acceptance criteria
 - [ ] walk the pinned yfinance public API (`Ticker`, `Tickers`, `download`, `Search`, `Lookup`, `Screener`, `EquityQuery`, `FundQuery`, `Sector`, `Industry`, `Market`, `WebSocket`) and confirm each has a Java counterpart or a documented reason for omission (deprecated upstream)

@@ -19,6 +19,7 @@
         <skipPublishing>true</skipPublishing>
         <maven.javadoc.skip>true</maven.javadoc.skip>
         <maven.source.skip>true</maven.source.skip>
+        <gpg.skip>true</gpg.skip>
         <exec.mainClass>io.andreygrigoriev.yfin.it.FixtureRecorder</exec.mainClass>
     </properties>
 
