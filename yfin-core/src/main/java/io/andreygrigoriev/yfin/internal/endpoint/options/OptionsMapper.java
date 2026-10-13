@@ -1,5 +1,7 @@
 package io.andreygrigoriev.yfin.internal.endpoint.options;
 
+import static io.andreygrigoriev.yfin.internal.http.YahooJson.text;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import io.andreygrigoriev.yfin.internal.http.YahooJson;
 import io.andreygrigoriev.yfin.model.OptionChain;
@@ -106,9 +108,5 @@ final class OptionsMapper {
 
     private static double number(JsonNode node) {
         return node.isNumber() ? node.doubleValue() : Double.NaN;
-    }
-
-    private static @Nullable String text(JsonNode node) {
-        return node.isTextual() && !node.asText().isEmpty() ? node.asText() : null;
     }
 }

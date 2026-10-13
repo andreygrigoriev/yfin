@@ -1,5 +1,8 @@
 package io.andreygrigoriev.yfin.internal.endpoint.domain;
 
+import static io.andreygrigoriev.yfin.internal.http.YahooJson.plainMap;
+import static io.andreygrigoriev.yfin.internal.http.YahooJson.text;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import io.andreygrigoriev.yfin.exception.YFDataException;
 import io.andreygrigoriev.yfin.internal.endpoint.Uris;
@@ -88,23 +91,23 @@ public final class MarketEndpoint {
         }
         var out = new ArrayList<MarketSummaryItem>(result.size());
         for (JsonNode q : result) {
-            String symbol = DomainJson.text(q.path("symbol"));
+            String symbol = text(q.path("symbol"));
             if (symbol == null) {
                 continue;
             }
             Long time = DomainJson.integral(q.path("regularMarketTime"));
             out.add(new MarketSummaryItem(
                     symbol,
-                    DomainJson.text(q.path("exchange")),
-                    DomainJson.text(q.path("shortName")),
-                    DomainJson.text(q.path("quoteType")),
+                    text(q.path("exchange")),
+                    text(q.path("shortName")),
+                    text(q.path("quoteType")),
                     DomainJson.number(q.path("regularMarketPrice")),
                     DomainJson.number(q.path("regularMarketChange")),
                     DomainJson.number(q.path("regularMarketChangePercent")),
                     DomainJson.number(q.path("regularMarketPreviousClose")),
                     time != null ? Instant.ofEpochSecond(time) : null,
-                    DomainJson.text(q.path("marketState")),
-                    DomainJson.map(q)));
+                    text(q.path("marketState")),
+                    plainMap(q)));
         }
         return out;
     }
@@ -118,29 +121,29 @@ public final class MarketEndpoint {
         if (!time.isObject()) {
             throw new YFDataException("market time response has no market time", root.toString());
         }
-        String id = DomainJson.text(time.path("id"));
+        String id = text(time.path("id"));
         if (region != MarketRegion.US && "us".equals(id)) {
             LOG.warn("{}: Yahoo's markettime endpoint does not support market {}; no status", region, region);
             return Optional.empty();
         }
         JsonNode tz = time.path("timezone").path(0);
         ZoneId zone = zone(tz, root);
-        Map<String, Object> raw = new LinkedHashMap<>(DomainJson.map(time));
+        Map<String, Object> raw = new LinkedHashMap<>(plainMap(time));
         raw.remove("time"); // redundant, as yfinance
         return Optional.of(new MarketStatus(
                 id,
-                DomainJson.text(time.path("name")),
-                DomainJson.text(time.path("status")),
-                DomainJson.text(time.path("message")),
+                text(time.path("name")),
+                text(time.path("status")),
+                text(time.path("message")),
                 instant(time.path("open"), root).atZone(zone),
                 instant(time.path("close"), root).atZone(zone),
                 zone,
-                DomainJson.text(tz.path("short")),
+                text(tz.path("short")),
                 raw));
     }
 
     private static ZoneId zone(JsonNode tz, JsonNode root) {
-        String name = DomainJson.text(tz.path("$text"));
+        String name = text(tz.path("$text"));
         if (name != null) {
             try {
                 return ZoneId.of(name);
@@ -148,7 +151,7 @@ public final class MarketEndpoint {
                 LOG.debug("unknown market time zone {}, using the GMT offset", name);
             }
         }
-        String offset = DomainJson.text(tz.path("gmtoffset"));
+        String offset = text(tz.path("gmtoffset"));
         if (offset != null) {
             try {
                 return ZoneOffset.ofTotalSeconds(Integer.parseInt(offset.trim()));
@@ -160,7 +163,7 @@ public final class MarketEndpoint {
     }
 
     private static Instant instant(JsonNode node, JsonNode root) {
-        @Nullable String text = DomainJson.text(node);
+        @Nullable String text = text(node);
         if (text == null) {
             throw new YFDataException("market time has no open/close", root.toString());
         }

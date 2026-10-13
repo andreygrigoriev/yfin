@@ -1,5 +1,9 @@
 package io.andreygrigoriev.yfin.internal.endpoint.search;
 
+import static io.andreygrigoriev.yfin.internal.http.YahooJson.plainMap;
+import static io.andreygrigoriev.yfin.internal.http.YahooJson.plainMaps;
+import static io.andreygrigoriev.yfin.internal.http.YahooJson.text;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import io.andreygrigoriev.yfin.Search;
 import io.andreygrigoriev.yfin.exception.YFDataException;
@@ -70,32 +74,32 @@ public final class SearchEndpoint {
                 query,
                 quotes(root.path("quotes")),
                 NewsEndpoint.parseSearch(root),
-                Plain.maps(root.path("lists")),
-                Plain.maps(root.path("researchReports")),
-                Plain.maps(root.path("nav")),
-                Plain.map(root));
+                plainMaps(root.path("lists")),
+                plainMaps(root.path("researchReports")),
+                plainMaps(root.path("nav")),
+                plainMap(root));
     }
 
     /** Quotes with a symbol, as yfinance filters them (drops e.g. Crunchbase companies). */
     private static List<SearchQuote> quotes(JsonNode quotes) {
         var out = new ArrayList<SearchQuote>(quotes.size());
         for (JsonNode q : quotes) {
-            String symbol = Plain.text(q.path("symbol"));
+            String symbol = text(q.path("symbol"));
             if (symbol == null) {
                 continue;
             }
             out.add(new SearchQuote(
                     symbol,
-                    Plain.text(q.path("shortname")),
-                    Plain.text(q.path("longname")),
-                    Plain.text(q.path("quoteType")),
-                    Plain.text(q.path("typeDisp")),
-                    Plain.text(q.path("exchange")),
-                    Plain.text(q.path("exchDisp")),
-                    Plain.text(q.path("sector")),
-                    Plain.text(q.path("industry")),
+                    text(q.path("shortname")),
+                    text(q.path("longname")),
+                    text(q.path("quoteType")),
+                    text(q.path("typeDisp")),
+                    text(q.path("exchange")),
+                    text(q.path("exchDisp")),
+                    text(q.path("sector")),
+                    text(q.path("industry")),
                     Plain.number(q.path("score")),
-                    Plain.map(q)));
+                    plainMap(q)));
         }
         return out;
     }

@@ -100,7 +100,7 @@ public final class RetryPolicy {
             try {
                 response = call.get();
             } catch (YFTransportException e) {
-                if (attempt >= maxRetries) {
+                if (attempt >= maxRetries || !isRetryable(e)) {
                     throw e;
                 }
                 LOG.debug("transport failure, retry {}/{}: {}", attempt + 1, maxRetries, e.getMessage());
@@ -122,6 +122,13 @@ public final class RetryPolicy {
 
     static boolean isRetryable(int status) {
         return status == 429 || (status >= 500 && status < 600);
+    }
+
+    /** Transport failures are retried unless they are deterministic or the thread was interrupted. */
+    static boolean isRetryable(YFTransportException e) {
+        return !(e instanceof NonRetryableTransportException)
+                && !(e.getCause() instanceof InterruptedException)
+                && !Thread.currentThread().isInterrupted();
     }
 
     /** Full-jitter exponential backoff delay for 0-based {@code attempt}. */

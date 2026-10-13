@@ -56,8 +56,7 @@ public final class YFinanceLive {
         String userAgent;
         Duration connectTimeout;
         Duration heartbeatInterval = DEFAULT_HEARTBEAT_INTERVAL;
-        Duration reconnectInitialDelay = ReconnectPolicy.DEFAULT_INITIAL_DELAY;
-        Duration reconnectMaxDelay = ReconnectPolicy.DEFAULT_MAX_DELAY;
+        ReconnectPolicy reconnectPolicy = ReconnectPolicy.defaults();
 
         private Builder(YFinance client) {
             this.proxy = client.proxy().orElse(null);
@@ -108,11 +107,8 @@ public final class YFinanceLive {
          * initial * 2^(n-1))}; default 1s and 30s.
          */
         public Builder reconnectDelay(Duration initial, Duration max) {
-            positive(initial, "initial");
             positive(max, "max");
-            new ReconnectPolicy(initial, max); // validates max >= initial
-            this.reconnectInitialDelay = initial;
-            this.reconnectMaxDelay = max;
+            this.reconnectPolicy = new ReconnectPolicy(initial, max); // validates initial and max >= initial
             return this;
         }
 

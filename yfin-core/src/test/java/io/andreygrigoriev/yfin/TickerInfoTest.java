@@ -184,6 +184,21 @@ class TickerInfoTest {
     }
 
     @Test
+    void noFundamentalsSkipsTheTrailingPegRequest() {
+        // synthetic: Yahoo's "No fundamentals data found" answer, as for symbols without modules
+        fake.onGet(QUOTE_SUMMARY + "AAPL").respond(404, """
+                {"quoteSummary":{"result":null,"error":{"code":"Not Found",\
+                "description":"No fundamentals data found for symbol: AAPL"}}}""");
+        fake.onGet(QUOTE).query("symbols", "AAPL").respondFixture("quote/aapl.json");
+
+        TickerInfo info = yf.ticker("AAPL").info();
+
+        assertThat(info.marketState()).isNotNull(); // from the quote
+        assertThat(info.trailingPegRatio()).isNull();
+        assertThat(fake.requests()).noneMatch(r -> r.uri().getPath().startsWith(TIMESERIES));
+    }
+
+    @Test
     void trailingPegRatioFromTimeseries() {
         TickerInfo info = info("AAPL", "aapl.json");
 

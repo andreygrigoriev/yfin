@@ -112,6 +112,60 @@ class DFLibAdapterTest {
     }
 
     @Test
+    void eventsOnOneBarAreMergedSplitsMultiplied() {
+        var bars = List.of(new Bar(day(3), 1, 1, 1, 1, 1, 1), new Bar(day(10), 1, 1, 1, 1, 1, 1));
+        var x = DFLibAdapter.toDataFrame(history(
+                Interval.ONE_WEEK,
+                bars,
+                List.of(new Dividend(day(4), 0.25), new Dividend(day(6), 0.5)),
+                List.of(new Split(day(4), 2, 1), new Split(day(7), 3, 1)),
+                List.of()));
+
+        assertThat(doubles(x, "Dividends")).containsExactly(0.75, 0);
+        assertThat(doubles(x, "Stock Splits")).containsExactly(6, 0); // like yfinance's prod(), not 5
+    }
+
+    @Test
+    void eventsOutsideEveryBarAreDropped() {
+        // daily bars on Mon 3rd and Wed 5th: before the first bar, on the bar-less 4th, after the last
+        var bars = List.of(new Bar(day(3), 1, 1, 1, 1, 1, 1), new Bar(day(5), 1, 1, 1, 1, 1, 1));
+        var x = DFLibAdapter.toDataFrame(history(
+                Interval.ONE_DAY,
+                bars,
+                List.of(new Dividend(day(2), 1), new Dividend(day(4), 2), new Dividend(day(6), 3)),
+                List.of(),
+                List.of()));
+
+        assertThat(doubles(x, "Dividends")).containsExactly(0, 0);
+    }
+
+    @Test
+    void eventOnABarBoundaryBelongsToTheLaterBar() {
+        var bars = List.of(new Bar(day(3), 1, 1, 1, 1, 1, 1), new Bar(day(10), 1, 1, 1, 1, 1, 1));
+        var x = DFLibAdapter.toDataFrame(
+                history(Interval.ONE_WEEK, bars, List.of(new Dividend(day(10), 0.5)), List.of(), List.of()));
+
+        assertThat(doubles(x, "Dividends")).containsExactly(0, 0.5);
+    }
+
+    @Test
+    void monthlyBarsCoverTheirNominal31Days() {
+        var jan = ZonedDateTime.of(2025, 1, 1, 0, 0, 0, 0, NY);
+        var feb = ZonedDateTime.of(2025, 2, 1, 0, 0, 0, 0, NY);
+        var bars = List.of(new Bar(jan, 1, 1, 1, 1, 1, 1), new Bar(feb, 1, 1, 1, 1, 1, 1));
+        var x = DFLibAdapter.toDataFrame(history(
+                Interval.ONE_MONTH,
+                bars,
+                List.of(
+                        new Dividend(feb.withDayOfMonth(20), 0.5),
+                        new Dividend(feb.plusDays(31), 9)), // Mar 4: past Feb 1 + 31 days
+                List.of(),
+                List.of()));
+
+        assertThat(doubles(x, "Dividends")).containsExactly(0, 0.5);
+    }
+
+    @Test
     void weeklyEventLandsOnContainingBar() {
         var bars = List.of(new Bar(day(3), 1, 1, 1, 1, 1, 1), new Bar(day(10), 1, 1, 1, 1, 1, 1));
         DataFrame df = DFLibAdapter.toDataFrame(

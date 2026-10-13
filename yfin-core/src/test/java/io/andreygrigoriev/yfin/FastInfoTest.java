@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 
 import io.andreygrigoriev.yfin.model.Bar;
-import io.andreygrigoriev.yfin.model.FastInfo;
 import io.andreygrigoriev.yfin.model.HistoryMetadata;
 import io.andreygrigoriev.yfin.model.PriceHistory;
 import io.andreygrigoriev.yfin.request.HistoryRequest;
@@ -255,6 +254,61 @@ class FastInfoTest {
                 .containsEntry("marketCap", 15.0);
         // year daily, hourly with and without prepost, quote: each at most once
         assertThat(calls).hasValue(3);
+    }
+
+    @Test
+    void concurrentAccessorsFetchEachSourceOnce() throws Exception {
+        var yearCalls = new AtomicInteger();
+        var quoteCalls = new AtomicInteger();
+        FastInfo fi = new FastInfo(new FastInfo.Source() {
+            @Override
+            public PriceHistory yearDaily() {
+                yearCalls.incrementAndGet();
+                sleep(); // keeps the fetch in flight while the other threads arrive
+                return emptyHistory();
+            }
+
+            @Override
+            public PriceHistory weekHourly(boolean prepost) {
+                return emptyHistory();
+            }
+
+            @Override
+            public Map<String, Object> quote() {
+                quoteCalls.incrementAndGet();
+                sleep();
+                return Map.of("sharesOutstanding", 10L);
+            }
+        });
+        int threads = 16;
+        var start = new java.util.concurrent.CountDownLatch(1);
+        var workers = new java.util.ArrayList<Thread>();
+        for (int t = 0; t < threads; t++) {
+            workers.add(Thread.ofVirtual().start(() -> {
+                try {
+                    start.await();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                fi.lastPrice();
+                fi.shares();
+            }));
+        }
+        start.countDown();
+        for (Thread w : workers) {
+            w.join(10_000);
+        }
+
+        assertThat(yearCalls).hasValue(1);
+        assertThat(quoteCalls).hasValue(1);
+    }
+
+    private static void sleep() {
+        try {
+            Thread.sleep(50);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     private static PriceHistory emptyHistory() {

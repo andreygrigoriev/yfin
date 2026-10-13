@@ -49,9 +49,9 @@ import org.slf4j.LoggerFactory;
  * callers wait for one fetch. Cookies, crumb and strategy are persisted in the {@code cookie} cache
  * namespace and restored on construction.
  *
- * <p>Cookies: when the transport manages cookies itself ({@link JdkTransport}), its store is used
- * and persisted. Otherwise the session keeps its own store, records {@code Set-Cookie} headers and
- * sends a {@code Cookie} header.
+ * <p>Cookies: when the transport manages cookies itself ({@link Transport#cookieStore()}, as {@link
+ * JdkTransport} does), its store is used and persisted. Otherwise the session keeps its own store,
+ * records {@code Set-Cookie} headers of Yahoo hosts and sends a {@code Cookie} header.
  */
 public final class YahooSession {
 
@@ -117,10 +117,9 @@ public final class YahooSession {
         loadFromCache();
     }
 
-    /** Session over {@code transport}, reusing its cookie store when it is a {@link JdkTransport}. */
+    /** Session over {@code transport}, reusing its {@link Transport#cookieStore()} when it has one. */
     public static YahooSession create(Transport transport, Cache cache, RequestLimiter limiter, RetryPolicy retry) {
-        CookieStore store = transport instanceof JdkTransport jdk ? jdk.cookieStore() : null;
-        return new YahooSession(transport, store, cache, limiter, retry, Clock.systemUTC());
+        return new YahooSession(transport, transport.cookieStore(), cache, limiter, retry, Clock.systemUTC());
     }
 
     /** The strategy tried first on the next acquisition. */
@@ -310,8 +309,8 @@ public final class YahooSession {
     private HttpResponse send(HttpRequest request) {
         HttpRequest withCookies = manageCookieHeader ? addCookieHeader(request) : request;
         HttpResponse response = retry.execute(() -> limiter.call(() -> transport.send(withCookies)));
-        if (manageCookieHeader) {
-            storeCookies(request.uri(), response);
+        if (manageCookieHeader && isYahooHost(request.uri().getHost())) {
+            storeCookies(request.uri(), response); // third-party cookies never join the Yahoo session
         }
         return response;
     }
@@ -379,6 +378,15 @@ public final class YahooSession {
         return URLEncoder.encode(s, StandardCharsets.UTF_8);
     }
 
+    /** Whether {@code host} (or a cookie domain, with or without the leading dot) is Yahoo's. */
+    static boolean isYahooHost(@Nullable String host) {
+        if (host == null) {
+            return false;
+        }
+        String h = (host.startsWith(".") ? host.substring(1) : host).toLowerCase(Locale.ROOT);
+        return h.equals("yahoo.com") || h.endsWith(".yahoo.com");
+    }
+
     // ---- persistence ----
 
     private void persist() {
@@ -392,6 +400,9 @@ public final class YahooSession {
         ArrayNode list = root.putArray("cookies");
         long now = clock.instant().getEpochSecond();
         for (HttpCookie c : cookies.getCookies()) {
+            if (!isYahooHost(c.getDomain())) {
+                continue; // a transport's store may hold cookies of other hosts
+            }
             ObjectNode node = list.addObject();
             node.put("name", c.getName());
             node.put("value", c.getValue());

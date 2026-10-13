@@ -13,6 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import org.jspecify.annotations.Nullable;
@@ -150,5 +151,28 @@ public final class YahooJson {
 
     private static boolean isNotFound(String code) {
         return code.toLowerCase(Locale.ROOT).replace(" ", "").equals("notfound");
+    }
+
+    /** The node's text, or {@code null} when it is not a string or is empty. */
+    public static @Nullable String text(JsonNode node) {
+        return node.isTextual() && !node.asText().isEmpty() ? node.asText() : null;
+    }
+
+    /** {@link #toPlain} of an object node; an empty map for anything else. */
+    @SuppressWarnings("unchecked")
+    public static Map<String, Object> plainMap(JsonNode node) {
+        Object value = toPlain(node);
+        return value instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
+    }
+
+    /** {@link #plainMap} of each object in array {@code node}; non-objects skipped. */
+    public static List<Map<String, Object>> plainMaps(JsonNode node) {
+        var out = new ArrayList<Map<String, Object>>(node.size());
+        for (JsonNode element : node) {
+            if (element.isObject()) {
+                out.add(plainMap(element));
+            }
+        }
+        return out;
     }
 }

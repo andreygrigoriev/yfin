@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import io.andreygrigoriev.yfin.model.ValuationMeasures;
 import io.andreygrigoriev.yfin.request.Frequency;
 import java.time.LocalDate;
-import java.time.format.DateTimeParseException;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -13,7 +12,6 @@ import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import org.jspecify.annotations.Nullable;
 
 /**
  * Reshapes valuation {@code fundamentals-timeseries} results into {@link ValuationMeasures}, like
@@ -59,7 +57,7 @@ final class ValuationMapper {
                     continue;
                 }
                 for (JsonNode point : field.getValue()) {
-                    LocalDate date = asOfDate(point);
+                    LocalDate date = TimeseriesMapper.asOfDate(point);
                     JsonNode raw = point.path("reportedValue").path("raw");
                     if (date != null && raw.isNumber()) {
                         target.computeIfAbsent(base, k -> new HashMap<>()).put(date, raw.doubleValue());
@@ -85,17 +83,5 @@ final class ValuationMapper {
             rows.put(measure, new TreeMap<>(rowsSource.getOrDefault(measure, Map.of())));
         }
         return new ValuationMeasures(symbol, frequency, current, List.copyOf(dates), rows);
-    }
-
-    private static @Nullable LocalDate asOfDate(JsonNode point) {
-        JsonNode date = point.path("asOfDate");
-        if (!date.isTextual()) {
-            return null;
-        }
-        try {
-            return LocalDate.parse(date.textValue());
-        } catch (DateTimeParseException e) {
-            return null;
-        }
     }
 }

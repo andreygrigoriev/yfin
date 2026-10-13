@@ -8,6 +8,7 @@ import static io.andreygrigoriev.yfin.internal.repair.Frame.Col.LOW;
 import static io.andreygrigoriev.yfin.internal.repair.Frame.Col.OPEN;
 import static io.andreygrigoriev.yfin.internal.repair.Frame.Col.VOLUME;
 
+import io.andreygrigoriev.yfin.exception.YFRateLimitException;
 import io.andreygrigoriev.yfin.internal.repair.Frame.Col;
 import io.andreygrigoriev.yfin.request.Interval;
 import java.time.Duration;
@@ -53,6 +54,11 @@ final class Reconstruct {
     }
 
     private Reconstruct() {}
+
+    /** Whether {@code e} reports an interrupt, or the current thread has been interrupted. */
+    static boolean isInterrupt(RuntimeException e) {
+        return Thread.currentThread().isInterrupted() || e.getCause() instanceof InterruptedException;
+    }
 
     static Frame reconstruct(Frame input, Interval interval, boolean prepost, RepairContext ctx) {
         if (interval == Interval.ONE_MINUTE) {
@@ -198,7 +204,12 @@ final class Reconstruct {
             Frame fine;
             try {
                 fine = ctx.finer().fetch(sub, fetchStart, fetchEnd, prepost, startInterval);
+            } catch (YFRateLimitException e) {
+                throw e; // more requests would only be rate-limited too
             } catch (RuntimeException e) {
+                if (isInterrupt(e)) {
+                    throw e; // cancelled (e.g. a download): stop instead of returning unrepaired data
+                }
                 LOG.debug("{}: fetching {} data for reconstruction failed: {}", ctx.symbol(), sub, e.toString());
                 fine = null;
             }

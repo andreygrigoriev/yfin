@@ -1,5 +1,9 @@
-package io.andreygrigoriev.yfin.model;
+package io.andreygrigoriev.yfin;
 
+import io.andreygrigoriev.yfin.model.Bar;
+import io.andreygrigoriev.yfin.model.HistoryMetadata;
+import io.andreygrigoriev.yfin.model.PriceHistory;
+import io.andreygrigoriev.yfin.model.TickerInfo;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -30,8 +34,8 @@ import org.jspecify.annotations.Nullable;
  */
 public final class FastInfo {
 
-    /** Where {@link FastInfo} gets its data. Implemented by the library; public for testing. */
-    public interface Source {
+    /** Where {@link FastInfo} gets its data: {@link Ticker}'s requests, or a test's stub. */
+    interface Source {
 
         /** One year of daily bars, not adjusted, all-NaN rows kept. */
         PriceHistory yearDaily();
@@ -56,7 +60,7 @@ public final class FastInfo {
     private final Supplier<Map<String, Object>> quote;
     private final Supplier<Instant> now;
 
-    public FastInfo(Source source) {
+    FastInfo(Source source) {
         Objects.requireNonNull(source, "source");
         this.yearDaily = memoize(source::yearDaily);
         this.weekHourlyPrepost = memoize(() -> source.weekHourly(true));

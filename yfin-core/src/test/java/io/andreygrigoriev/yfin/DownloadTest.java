@@ -13,12 +13,15 @@ import io.andreygrigoriev.yfin.request.HistoryRequest;
 import io.andreygrigoriev.yfin.request.Period;
 import io.andreygrigoriev.yfin.spi.Cache;
 import io.andreygrigoriev.yfin.spi.HttpRequest;
-import io.andreygrigoriev.yfin.spi.HttpResponse;
 import io.andreygrigoriev.yfin.spi.Transport;
 import io.andreygrigoriev.yfin.testing.FakeTransport;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -158,6 +161,8 @@ class DownloadTest {
         symbols.forEach(this::ok);
         AtomicInteger inFlight = new AtomicInteger();
         AtomicInteger maxInFlight = new AtomicInteger();
+        // the first three chart requests wait for each other: proves 3 overlap without timing
+        CountDownLatch firstThree = new CountDownLatch(3);
         Transport slow = (HttpRequest request) -> {
             boolean chart = request.uri().getPath().startsWith(CHART);
             if (!chart) {
@@ -166,9 +171,11 @@ class DownloadTest {
             int now = inFlight.incrementAndGet();
             maxInFlight.accumulateAndGet(now, Math::max);
             try {
-                Thread.sleep(100);
-                HttpResponse response = fake.send(request);
-                return response;
+                firstThree.countDown();
+                if (!firstThree.await(10, TimeUnit.SECONDS)) {
+                    throw new AssertionError("3 requests were never in flight together");
+                }
+                return fake.send(request);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 throw new YFTransportException("interrupted", e);
@@ -183,6 +190,51 @@ class DownloadTest {
             assertThat(result).hasSize(8);
         }
         assertThat(maxInFlight.get()).isEqualTo(3);
+    }
+
+    @Test
+    void interruptCancelsPendingDownloadsAndRestoresFlag() throws Exception {
+        List<String> symbols = List.of("S1", "S2", "S3");
+        CountDownLatch allBlocked = new CountDownLatch(symbols.size());
+        AtomicInteger interruptedCalls = new AtomicInteger();
+        Transport hanging = (HttpRequest request) -> {
+            if (!request.uri().getPath().startsWith(CHART)) {
+                return fake.send(request);
+            }
+            allBlocked.countDown();
+            try {
+                new CountDownLatch(1).await(); // until cancelled
+                throw new AssertionError("not reached");
+            } catch (InterruptedException e) {
+                interruptedCalls.incrementAndGet();
+                Thread.currentThread().interrupt();
+                throw new YFTransportException("interrupted", e);
+            }
+        };
+        AtomicReference<Throwable> failure = new AtomicReference<>();
+        AtomicBoolean flagRestored = new AtomicBoolean();
+        try (YFinance client = client(hanging, 8)) {
+            Thread caller = Thread.ofVirtual().start(() -> {
+                try {
+                    client.download(symbols, MONTH);
+                } catch (Throwable t) {
+                    failure.set(t);
+                    flagRestored.set(Thread.currentThread().isInterrupted());
+                }
+            });
+            assertThat(allBlocked.await(10, TimeUnit.SECONDS)).isTrue();
+
+            caller.interrupt();
+            caller.join(10_000);
+
+            assertThat(caller.isAlive()).isFalse();
+        }
+        assertThat(failure.get())
+                .isInstanceOf(YFTransportException.class)
+                .hasMessageContaining("interrupted while downloading")
+                .hasCauseInstanceOf(InterruptedException.class);
+        assertThat(flagRestored).isTrue();
+        assertThat(interruptedCalls).hasValue(symbols.size()); // every pending download was cancelled
     }
 
     @Test

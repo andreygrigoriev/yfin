@@ -50,11 +50,6 @@ final class Stats {
         return (n & 1) == 1 ? s[n / 2] : (s[n / 2 - 1] + s[n / 2]) / 2;
     }
 
-    /** {@code np.nanmedian}: median of the non-NaN values, NaN when there are none. */
-    static double nanMedian(double[] v) {
-        return median(Arrays.stream(v).filter(x -> !Double.isNaN(x)).toArray());
-    }
-
     /** {@code np.percentile(v, q)} with linear interpolation; NaN if any value is NaN. */
     static double percentile(double[] v, double q) {
         if (v.length == 0) {
@@ -151,11 +146,6 @@ final class Stats {
             label++;
         }
         return labels;
-    }
-
-    /** Values of {@code v} at {@code mask}. */
-    static double[] masked(double[] v, boolean[] mask) {
-        return Arrays.stream(Frame.where(mask)).mapToDouble(i -> v[i]).toArray();
     }
 
     static double nanMax(double a, double b) {

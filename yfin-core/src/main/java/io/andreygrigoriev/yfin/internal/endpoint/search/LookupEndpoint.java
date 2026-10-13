@@ -1,5 +1,8 @@
 package io.andreygrigoriev.yfin.internal.endpoint.search;
 
+import static io.andreygrigoriev.yfin.internal.http.YahooJson.plainMap;
+import static io.andreygrigoriev.yfin.internal.http.YahooJson.text;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import io.andreygrigoriev.yfin.Lookup;
 import io.andreygrigoriev.yfin.exception.YFDataException;
@@ -67,20 +70,20 @@ public final class LookupEndpoint {
         JsonNode documents = result.get(0).path("documents");
         var out = new ArrayList<LookupResult>(documents.size());
         for (JsonNode d : documents) {
-            String symbol = Plain.text(d.path("symbol"));
+            String symbol = text(d.path("symbol"));
             if (symbol == null) {
                 continue;
             }
             out.add(new LookupResult(
                     symbol,
-                    Plain.text(d.path("shortName")),
-                    Plain.text(d.path("quoteType")),
-                    Plain.text(d.path("exchange")),
+                    text(d.path("shortName")),
+                    text(d.path("quoteType")),
+                    text(d.path("exchange")),
                     Plain.number(d.path("regularMarketPrice")),
                     Plain.number(d.path("regularMarketChange")),
                     Plain.number(d.path("regularMarketPercentChange")),
                     Plain.integral(d.path("rank")),
-                    Plain.map(d)));
+                    plainMap(d)));
         }
         return List.copyOf(out);
     }

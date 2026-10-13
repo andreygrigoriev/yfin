@@ -10,6 +10,7 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 
 class HistoryRequestTest {
@@ -106,6 +107,47 @@ class HistoryRequestTest {
         assertThatThrownBy(b::build)
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("not before");
+    }
+
+    @ParameterizedTest
+    @CsvSource({"ONE_MINUTE, 30", "TWO_MINUTES, 60", "NINETY_MINUTES, 60", "ONE_HOUR, 730", "SIXTY_MINUTES, 730"})
+    void lookbackLimitIsExactlyLimitPlusOneDaySlack(Interval interval, int days) {
+        Instant edge = NOW.minus(Duration.ofDays(days + 1)); // limit + LIMIT_SLACK
+        Instant end = edge.plus(Duration.ofDays(1));
+
+        assertThat(HistoryRequest.builder()
+                        .interval(interval)
+                        .start(edge)
+                        .end(end)
+                        .build(CLOCK))
+                .isNotNull();
+        assertThatThrownBy(() -> HistoryRequest.builder()
+                        .interval(interval)
+                        .start(edge.minusSeconds(1))
+                        .end(end)
+                        .build(CLOCK))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("only available for the last " + days + " days");
+    }
+
+    @Test
+    void oneMinuteSpanIsExactlyEightDaysPlusOneDaySlack() {
+        Instant end = NOW.minus(Duration.ofDays(1));
+        Instant start = end.minus(Duration.ofDays(9)); // 8 days + LIMIT_SLACK
+
+        assertThat(HistoryRequest.builder()
+                        .interval(Interval.ONE_MINUTE)
+                        .start(start)
+                        .end(end)
+                        .build(CLOCK))
+                .isNotNull();
+        assertThatThrownBy(() -> HistoryRequest.builder()
+                        .interval(Interval.ONE_MINUTE)
+                        .start(start.minusSeconds(1))
+                        .end(end)
+                        .build(CLOCK))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("8 days per request");
     }
 
     @Test

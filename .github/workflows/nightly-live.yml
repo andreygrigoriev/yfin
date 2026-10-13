@@ -1,8 +1,8 @@
 name: nightly-live
 
-# Live integration suite against Yahoo Finance. Yahoo changes endpoints and throttling
-# without notice; this run is the early-warning signal. On failure it opens an issue
-# labelled "nightly-live", or comments on the one already open.
+# Live integration suite against Yahoo Finance, on the JVM and as a native image. Yahoo
+# changes endpoints and throttling without notice; this run is the early-warning signal. On
+# failure it opens an issue labelled "nightly-live", or comments on the one already open.
 
 on:
   schedule:
@@ -41,10 +41,43 @@ jobs:
           path: "**/target/failsafe-reports/"
           retention-days: 14
 
-      - name: Open or update failure issue
+  # the only end-to-end check of the native image over HTTPS/TLS and wss: builds native-smoke and
+  # makes NativeSmokeIT fail (not skip) when it is missing. Native unit tests run in ci.yml already.
+  native-live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: graalvm/setup-graalvm@v1
+        with:
+          java-version: "25"
+          distribution: graalvm
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          cache: maven
+
+      - name: Native smoke against live Yahoo
+        run: >-
+          ./mvnw --batch-mode --no-transfer-progress verify -Plive,native
+          -DskipNativeTests -Dnative.smoke.required=true -Dit.test=NativeSmokeIT
+
+      - name: Upload failsafe reports
         if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-failsafe-reports
+          path: "**/target/failsafe-reports/"
+          retention-days: 14
+
+  report:
+    needs: [live, native-live]
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Open or update failure issue
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail

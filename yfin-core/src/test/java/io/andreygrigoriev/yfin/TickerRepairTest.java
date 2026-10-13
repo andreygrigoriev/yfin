@@ -3,6 +3,9 @@ package io.andreygrigoriev.yfin;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.andreygrigoriev.yfin.internal.cache.FileCache;
 import io.andreygrigoriev.yfin.model.Bar;
 import io.andreygrigoriev.yfin.model.PriceHistory;
@@ -11,6 +14,7 @@ import io.andreygrigoriev.yfin.request.Interval;
 import io.andreygrigoriev.yfin.request.Period;
 import io.andreygrigoriev.yfin.spi.HttpRequest;
 import io.andreygrigoriev.yfin.testing.FakeTransport;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.DayOfWeek;
 import java.util.List;
@@ -115,6 +119,36 @@ class TickerRepairTest {
                     .containsEntry("interval", List.of("1d"))
                     .containsKey("period1")
                     .doesNotContainKey("range");
+        }
+    }
+
+    @Test
+    void eventAccessorsAreNeverRepaired() throws Exception {
+        // synthetic: the recorded year with one close 100x too high, which repair would
+        // reconstruct from hourly data
+        var root = (ObjectNode) new ObjectMapper()
+                .readTree(Files.readString(FakeTransport.DEFAULT_FIXTURE_ROOT.resolve("chart/aapl-1d-1y.json")));
+        var close = (ArrayNode) root.at("/chart/result/0/indicators/quote/0/close");
+        close.set(100, close.get(100).asDouble() * 100);
+        fake.onGet(CHART + "AAPL").query("interval", "1d").respond(200, root.toString());
+        fake.onGet(CHART + "AAPL").query("interval", "1h").respondFixture(404, "chart/not-found.json");
+        try (YFinance plain = client(false);
+                YFinance repairing = client(true)) {
+            var expected = plain.ticker("AAPL").actions();
+            fake.clearRequests();
+
+            assertThat(repairing.ticker("AAPL").actions()).isEqualTo(expected);
+            assertThat(repairing.ticker("AAPL").dividends()).isEqualTo(expected.dividends());
+            // exactly the two event requests: no reconstruction fetches of finer data
+            assertThat(chartRequests()).hasSize(2);
+
+            fake.clearRequests();
+            repairing
+                    .ticker("AAPL")
+                    .history(HistoryRequest.builder().period(Period.MAX).build());
+            assertThat(chartRequests())
+                    .as("repair of history() still reconstructs")
+                    .hasSizeGreaterThan(1);
         }
     }
 

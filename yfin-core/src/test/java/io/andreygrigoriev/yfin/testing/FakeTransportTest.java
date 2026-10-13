@@ -57,6 +57,22 @@ class FakeTransportTest {
     }
 
     @Test
+    void hostRestrictsTheRule() {
+        var transport = FakeTransport.create()
+                .onGet("/v1/test/getcrumb")
+                .host("query2.finance.yahoo.com")
+                .respond(200, "crumb2")
+                .onGet("/v1/test/getcrumb")
+                .respond(200, "any");
+
+        assertThat(transport
+                        .send(HttpRequest.get(URI.create("https://QUERY2.finance.yahoo.com/v1/test/getcrumb")))
+                        .bodyAsString())
+                .isEqualTo("crumb2");
+        assertThat(transport.send(get("/v1/test/getcrumb")).bodyAsString()).isEqualTo("any");
+    }
+
+    @Test
     void firstMatchingRuleWins() {
         var transport = FakeTransport.create()
                 .onGet("/q")

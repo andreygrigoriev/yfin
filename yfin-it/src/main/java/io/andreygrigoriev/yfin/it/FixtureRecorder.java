@@ -13,6 +13,7 @@ import io.andreygrigoriev.yfin.spi.Transport;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UncheckedIOException;
+import java.net.CookieStore;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -141,6 +142,11 @@ public final class FixtureRecorder implements Transport {
     public FixtureRecorder(Transport delegate, Path root) {
         this.delegate = Objects.requireNonNull(delegate, "delegate");
         this.root = Objects.requireNonNull(root, "root");
+    }
+
+    @Override
+    public @Nullable CookieStore cookieStore() {
+        return delegate.cookieStore();
     }
 
     @Override

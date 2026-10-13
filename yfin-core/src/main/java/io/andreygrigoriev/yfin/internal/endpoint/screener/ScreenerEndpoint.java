@@ -1,5 +1,8 @@
 package io.andreygrigoriev.yfin.internal.endpoint.screener;
 
+import static io.andreygrigoriev.yfin.internal.http.YahooJson.plainMap;
+import static io.andreygrigoriev.yfin.internal.http.YahooJson.text;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.andreygrigoriev.yfin.Screener;
@@ -130,7 +133,7 @@ public final class ScreenerEndpoint {
         var quotes = new ArrayList<Map<String, Object>>();
         for (JsonNode q : r.path("quotes")) {
             if (q.isObject()) {
-                quotes.add(map(q));
+                quotes.add(plainMap(q));
             }
         }
         return new ScreenerResult(
@@ -141,16 +144,6 @@ public final class ScreenerEndpoint {
                 r.path("count").isNumber() ? r.path("count").asInt() : quotes.size(),
                 r.path("total").isNumber() ? r.path("total").asLong() : null,
                 List.copyOf(quotes),
-                map(r));
-    }
-
-    private static @Nullable String text(JsonNode node) {
-        return node.isTextual() && !node.asText().isEmpty() ? node.asText() : null;
-    }
-
-    @SuppressWarnings("unchecked")
-    private static Map<String, Object> map(JsonNode node) {
-        Object value = YahooJson.toPlain(node);
-        return value instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
+                plainMap(r));
     }
 }

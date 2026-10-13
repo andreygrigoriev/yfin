@@ -10,7 +10,7 @@
 
 | Command | What it runs |
 |---|---|
-| `./mvnw verify` | unit tests for every module, the Spotless format check, javadoc lint and the JPMS export smoke test. CI runs this on every push. |
+| `./mvnw verify` | unit tests for every module, the Spotless format check, javadoc lint and the JPMS export smoke test. CI (`ci.yml`) runs this on every push, plus a GraalVM job running `-Pnative test`. |
 | `./mvnw -Plive verify` | the above plus the live integration suite (`yfin-it`, failsafe), run against Yahoo Finance |
 | `./mvnw -Pnative test` | every module's unit tests compiled and run as a GraalVM native image |
 | `./mvnw -Plive,native verify` | also builds the `native-smoke` consumer executable and runs it against Yahoo |
@@ -28,7 +28,8 @@ Unit tests never touch the network. All HTTP goes through the `Transport` SPI, a
 - Javadoc lint (`doclint all,-missing`) runs on `verify`, and warnings fail the build. It checks
   syntax, HTML, references and accessibility. It does not flag missing tags, but you should still
   document public types and methods in exported packages.
-- Every package is `@NullMarked` (JSpecify). Mark nullable values with `@Nullable`.
+- Every package has a `package-info.java` with `@NullMarked` (JSpecify). Mark nullable values
+  with `@Nullable`.
 - Public models are immutable records with unmodifiable collections. Missing time-series numbers
   are `Double.NaN`. Missing scalar snapshot fields are `null`.
 - When Yahoo has no data, return an empty list or `Optional.empty()`. Throw only for real errors,
@@ -115,11 +116,26 @@ A request that matches no rule fails with an `AssertionError` that lists the reg
   values, because the data changes daily.
 - The clients use `Cache.none()` (see `LiveClients`), so every run goes through the full
   cookie/crumb bootstrap.
-- A GitHub Actions workflow (`nightly-live.yml`) runs the suite every night. A failure there usually
+- A GitHub Actions workflow (`nightly-live.yml`) runs the suite every night, on the JVM and, as
+  `NativeSmokeIT` with `-Plive,native -Dnative.smoke.required=true`, as a native image (a missing
+  `native-smoke` executable fails the test there instead of skipping it). A failure there usually
   means Yahoo changed an endpoint. Re-record the affected fixtures and update the parser.
 
 Keep the live suite small. Yahoo rate-limits by IP, and a long suite can get your address blocked
 for a while.
+
+## Releasing
+
+Releases are cut by pushing a tag; `.github/workflows/release.yml` does the rest:
+
+1. Push a tag `vX.Y.Z` (a suffix such as `v1.2.0-rc1` makes a GitHub pre-release).
+2. The workflow sets the version from the tag (`versions:set -DnewVersion=X.Y.Z`), runs
+   `./mvnw -Prelease deploy` to sign and publish every published module to Maven Central, and
+   creates a GitHub release with `gh release create` and the module jars attached.
+
+It needs these repository secrets: `CENTRAL_USERNAME` and `CENTRAL_TOKEN` (a Central Portal user
+token), `GPG_PRIVATE_KEY` (armored) and `GPG_PASSPHRASE`. Check the release build locally first
+with `./mvnw -Prelease package -Dgpg.skip`.
 
 ## Pull requests
 

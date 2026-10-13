@@ -1,5 +1,9 @@
 package io.andreygrigoriev.yfin.internal.endpoint.domain;
 
+import static io.andreygrigoriev.yfin.internal.http.YahooJson.plainMap;
+import static io.andreygrigoriev.yfin.internal.http.YahooJson.plainMaps;
+import static io.andreygrigoriev.yfin.internal.http.YahooJson.text;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import io.andreygrigoriev.yfin.exception.YFDataException;
 import io.andreygrigoriev.yfin.exception.YFSymbolNotFoundException;
@@ -31,29 +35,29 @@ public final class IndustryEndpoint {
     }
 
     static IndustryData parse(String key, JsonNode data) {
-        String k = DomainJson.text(data.path("key"));
+        String k = text(data.path("key"));
         return new IndustryData(
                 k != null ? k : key,
-                DomainJson.text(data.path("name")),
-                DomainJson.text(data.path("symbol")),
-                DomainJson.text(data.path("sectorKey")),
-                DomainJson.text(data.path("sectorName")),
+                text(data.path("name")),
+                text(data.path("symbol")),
+                text(data.path("sectorKey")),
+                text(data.path("sectorName")),
                 DomainJson.overview(data.path("overview")),
                 DomainJson.topCompanies(data.path("topCompanies")),
                 performing(data.path("topPerformingCompanies")),
                 growth(data.path("topGrowthCompanies")),
-                DomainJson.maps(data.path("researchReports")),
-                DomainJson.map(data));
+                plainMaps(data.path("researchReports")),
+                plainMap(data));
     }
 
     private static List<PerformingCompany> performing(JsonNode array) {
         var out = new ArrayList<PerformingCompany>(array.size());
         for (JsonNode c : array) {
-            String symbol = DomainJson.text(c.path("symbol"));
+            String symbol = text(c.path("symbol"));
             if (symbol != null) {
                 out.add(new PerformingCompany(
                         symbol,
-                        DomainJson.text(c.path("name")),
+                        text(c.path("name")),
                         DomainJson.number(c.path("ytdReturn")),
                         DomainJson.number(c.path("lastPrice")),
                         DomainJson.number(c.path("targetPrice"))));
@@ -65,11 +69,11 @@ public final class IndustryEndpoint {
     private static List<GrowthCompany> growth(JsonNode array) {
         var out = new ArrayList<GrowthCompany>(array.size());
         for (JsonNode c : array) {
-            String symbol = DomainJson.text(c.path("symbol"));
+            String symbol = text(c.path("symbol"));
             if (symbol != null) {
                 out.add(new GrowthCompany(
                         symbol,
-                        DomainJson.text(c.path("name")),
+                        text(c.path("name")),
                         DomainJson.number(c.path("ytdReturn")),
                         DomainJson.number(c.path("growthEstimate"))));
             }

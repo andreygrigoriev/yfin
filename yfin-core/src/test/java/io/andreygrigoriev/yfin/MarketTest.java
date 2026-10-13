@@ -45,8 +45,14 @@ class MarketTest {
 
     @Test
     void usMarket() {
-        fake.onGet(SUMMARY).query("market", "US").respondFixture("market/summary-us.json");
-        fake.onGet(TIME).query("market", "US").respondFixture("market/markettime-us.json");
+        fake.onGet(SUMMARY)
+                .host("query1.finance.yahoo.com")
+                .query("market", "US")
+                .respondFixture("market/summary-us.json");
+        fake.onGet(TIME)
+                .host("query1.finance.yahoo.com")
+                .query("market", "US")
+                .respondFixture("market/markettime-us.json");
 
         Market m = yf.market("us");
 

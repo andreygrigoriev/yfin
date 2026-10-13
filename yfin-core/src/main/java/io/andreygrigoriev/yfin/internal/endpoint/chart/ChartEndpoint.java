@@ -5,6 +5,7 @@ import io.andreygrigoriev.yfin.exception.YFDataException;
 import io.andreygrigoriev.yfin.internal.endpoint.Uris;
 import io.andreygrigoriev.yfin.internal.http.YahooJson;
 import io.andreygrigoriev.yfin.internal.http.YahooSession;
+import io.andreygrigoriev.yfin.internal.repair.Intervals;
 import io.andreygrigoriev.yfin.internal.repair.PriceRepair;
 import io.andreygrigoriev.yfin.internal.repair.RepairContext;
 import io.andreygrigoriev.yfin.model.HistoryMetadata;
@@ -51,26 +52,18 @@ public final class ChartEndpoint {
 
     private final YahooSession session;
     private final Cache cache;
-    private final Clock clock;
-    private final boolean defaultRepair;
+    /**
+     * The system clock, which {@link HistoryRequest.Builder#build()} validates intraday limits
+     * against too, so nested reconstruction requests see the same "now" as this endpoint.
+     */
+    private final Clock clock = Clock.systemUTC();
 
-    public ChartEndpoint(YahooSession session, Cache cache) {
-        this(session, cache, false);
-    }
+    private final boolean defaultRepair;
 
     /** @param defaultRepair whether requests that do not say so are price-repaired */
     public ChartEndpoint(YahooSession session, Cache cache, boolean defaultRepair) {
-        this(session, cache, Clock.systemUTC(), defaultRepair);
-    }
-
-    ChartEndpoint(YahooSession session, Cache cache, Clock clock) {
-        this(session, cache, clock, false);
-    }
-
-    ChartEndpoint(YahooSession session, Cache cache, Clock clock, boolean defaultRepair) {
         this.session = Objects.requireNonNull(session, "session");
         this.cache = Objects.requireNonNull(cache, "cache");
-        this.clock = Objects.requireNonNull(clock, "clock");
         this.defaultRepair = defaultRepair;
     }
 
@@ -103,8 +96,7 @@ public final class ChartEndpoint {
         if (target == Interval.FIVE_DAYS) {
             throw new IllegalArgumentException("Yahoo's 5d interval is not supported with price repair");
         }
-        boolean multiday =
-                target == Interval.ONE_WEEK || target == Interval.ONE_MONTH || target == Interval.THREE_MONTHS;
+        boolean multiday = Intervals.multiday(target);
         HistoryRequest effective = request;
         boolean ytd = request.period().orElse(null) == Period.YTD;
         if (multiday) {
@@ -127,8 +119,7 @@ public final class ChartEndpoint {
                     .repair(true)
                     .build();
             PriceHistory h = repairedHistory(symbol, fine, outer);
-            String type = h.metadata().instrumentType();
-            boolean funds = "MUTUALFUND".equals(type) || "ETF".equals(type);
+            boolean funds = ChartMapper.hasCapitalGains(h.metadata().instrumentType());
             return PriceRepair.frameOf(h.bars(), h.dividends(), h.splits(), h.capitalGains(), funds, sub);
         };
         RepairContext ctx =

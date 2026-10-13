@@ -4,7 +4,7 @@ import io.andreygrigoriev.yfin.request.Interval;
 import java.time.ZonedDateTime;
 
 /** yfinance's interval string tests and {@code _interval_to_timedelta}. */
-final class Intervals {
+public final class Intervals {
 
     private Intervals() {}
 
@@ -14,7 +14,7 @@ final class Intervals {
     }
 
     /** {@code interval in ['1wk', '1mo', '3mo']}. */
-    static boolean multiday(Interval i) {
+    public static boolean multiday(Interval i) {
         return i == Interval.ONE_WEEK || i == Interval.ONE_MONTH || i == Interval.THREE_MONTHS;
     }
 

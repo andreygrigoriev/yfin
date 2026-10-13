@@ -43,7 +43,9 @@ class DomainIT {
 
         assertThat(i.sectorKey()).isEqualTo("technology");
         assertThat(i.topCompanies()).isNotEmpty();
-        assertThat(i.topPerformingCompanies()).isNotNull();
+        // Yahoo often has no performing companies; when it has, each has a symbol
+        assertThat(i.topPerformingCompanies())
+                .allSatisfy(c -> assertThat(c.symbol()).isNotBlank());
     }
 
     @Test

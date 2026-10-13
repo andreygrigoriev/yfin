@@ -1,6 +1,7 @@
 package io.andreygrigoriev.yfin.it;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 import io.andreygrigoriev.yfin.Ticker;
 import io.andreygrigoriev.yfin.YFinance;
@@ -59,7 +60,7 @@ class AnalystIT {
 
     @Test
     void sustainabilityIsOptional() {
-        // Yahoo drops ESG data for many symbols; only check the call succeeds
-        assertThat(yf.ticker("AAPL").sustainability()).isNotNull();
+        // Yahoo drops ESG data for many symbols: the call must succeed, the data may be absent
+        assertThatCode(() -> yf.ticker("AAPL").sustainability()).doesNotThrowAnyException();
     }
 }

@@ -91,7 +91,8 @@ final class TimeseriesMapper {
         return new FinancialStatement(symbol, frequency, currency, kept, rows);
     }
 
-    private static @Nullable LocalDate asOfDate(JsonNode point) {
+    /** The point's {@code asOfDate}, or {@code null} when absent or unparseable. */
+    static @Nullable LocalDate asOfDate(JsonNode point) {
         JsonNode date = point.path("asOfDate");
         if (!date.isTextual()) {
             return null;

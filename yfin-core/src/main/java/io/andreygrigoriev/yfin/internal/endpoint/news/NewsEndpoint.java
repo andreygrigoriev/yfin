@@ -1,5 +1,8 @@
 package io.andreygrigoriev.yfin.internal.endpoint.news;
 
+import static io.andreygrigoriev.yfin.internal.http.YahooJson.plainMap;
+import static io.andreygrigoriev.yfin.internal.http.YahooJson.text;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.andreygrigoriev.yfin.exception.YFDataException;
@@ -15,7 +18,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -132,7 +134,7 @@ public final class NewsEndpoint {
                     text(content.path("contentType")),
                     thumbnail(content.path("thumbnail")),
                     related,
-                    plain(article)));
+                    plainMap(article)));
         }
         return List.copyOf(out);
     }
@@ -171,7 +173,7 @@ public final class NewsEndpoint {
                     text(article.path("type")),
                     thumbnail(article.path("thumbnail")),
                     related,
-                    plain(article)));
+                    plainMap(article)));
         }
         return List.copyOf(out);
     }
@@ -227,15 +229,5 @@ public final class NewsEndpoint {
     private static @Nullable String firstText(JsonNode a, JsonNode b) {
         String first = text(a);
         return first != null ? first : text(b);
-    }
-
-    private static @Nullable String text(JsonNode node) {
-        return node.isTextual() && !node.asText().isEmpty() ? node.asText() : null;
-    }
-
-    @SuppressWarnings("unchecked")
-    private static Map<String, Object> plain(JsonNode node) {
-        Object value = YahooJson.toPlain(node);
-        return value instanceof Map<?, ?> map ? (Map<String, Object>) map : Map.of();
     }
 }

@@ -13,9 +13,13 @@ import io.andreygrigoriev.yfin.model.SectorIndustry;
 import io.andreygrigoriev.yfin.model.TopCompany;
 import io.andreygrigoriev.yfin.spi.Cache;
 import io.andreygrigoriev.yfin.spi.HttpRequest;
+import io.andreygrigoriev.yfin.spi.Transport;
 import io.andreygrigoriev.yfin.testing.FakeTransport;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CountDownLatch;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -172,6 +176,65 @@ class SectorIndustryTest {
         assertThat(s.name()).isEqualTo("Technology");
         assertThat(s.industries()).isNotEmpty();
         assertThat(sectorRequests()).hasSize(2);
+    }
+
+    @Test
+    void concurrentAccessorsShareOneFetch() throws Exception {
+        fake.onGet(SECTORS + "technology").respondFixture("sector/technology.json");
+        fake.onGet(INDUSTRIES + "semiconductors").respondFixture("industry/semiconductors.json");
+        Transport slow = request -> {
+            if (request.uri().getPath().startsWith("/v1/finance/")) {
+                try {
+                    Thread.sleep(50); // keeps the first fetch in flight while the others arrive
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+            return fake.send(request);
+        };
+        try (YFinance client = YFinance.builder()
+                .transport(slow)
+                .cache(Cache.none())
+                .maxRetries(0)
+                .build()) {
+            Sector sector = client.sector("technology");
+            Industry industry = client.industry("semiconductors");
+            int threads = 16;
+            var start = new CountDownLatch(1);
+            var names = new ConcurrentLinkedQueue<String>();
+            var workers = new ArrayList<Thread>();
+            for (int t = 0; t < threads; t++) {
+                boolean even = t % 2 == 0;
+                workers.add(Thread.ofVirtual().start(() -> {
+                    try {
+                        start.await();
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                    names.add(even ? sector.name() : industry.name());
+                }));
+            }
+            start.countDown();
+            for (Thread w : workers) {
+                w.join(10_000);
+            }
+
+            assertThat(names).hasSize(threads).containsOnly("Technology", "Semiconductors");
+        }
+        assertThat(sectorRequests()).hasSize(1);
+        assertThat(fake.requests())
+                .filteredOn(r -> r.uri().getPath().startsWith(INDUSTRIES))
+                .hasSize(1);
+    }
+
+    @Test
+    void industryErrorPayload() {
+        // the industries endpoint shares the /v1/finance error envelope of the sectors endpoint
+        fake.onGet(INDUSTRIES + "semiconductors").respondFixture(400, "sector/error.json");
+
+        assertThatThrownBy(() -> yf.industry("semiconductors").topCompanies())
+                .isInstanceOf(YFDataException.class)
+                .hasMessageContaining("backend failure");
     }
 
     @Test

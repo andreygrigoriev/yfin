@@ -29,7 +29,6 @@ import io.andreygrigoriev.yfin.model.EarningsEstimate;
 import io.andreygrigoriev.yfin.model.EarningsHistoryEntry;
 import io.andreygrigoriev.yfin.model.EpsRevisions;
 import io.andreygrigoriev.yfin.model.EpsTrend;
-import io.andreygrigoriev.yfin.model.FastInfo;
 import io.andreygrigoriev.yfin.model.FinancialStatement;
 import io.andreygrigoriev.yfin.model.FundsData;
 import io.andreygrigoriev.yfin.model.GrowthEstimate;
@@ -76,10 +75,12 @@ import org.jspecify.annotations.Nullable;
  */
 public final class Ticker {
 
+    /** Events request: never price-repaired, like yfinance's {@code get_dividends} and friends. */
     private static final HistoryRequest ALL_DAILY = HistoryRequest.builder()
             .period(Period.MAX)
             .interval(Interval.ONE_DAY)
             .prepost(true)
+            .repair(false)
             .build();
 
     private static final HistoryRequest FAST_INFO_YEAR = HistoryRequest.builder()
@@ -153,13 +154,16 @@ public final class Ticker {
      * Everything Yahoo reports about the symbol (profile, valuation, key statistics, latest quote),
      * flattened like yfinance's {@code info}. Three requests: {@code quoteSummary}, {@code
      * /v7/finance/quote} and the fundamentals timeseries for the complementary {@code
-     * trailingPegRatio}. Fields Yahoo has no data for are absent, never an error.
+     * trailingPegRatio}, which is skipped when {@code quoteSummary} has no data (as yfinance's
+     * {@code _fetch_complementary} returns early then). Fields Yahoo has no data for are absent,
+     * never an error.
      */
     public TickerInfo info() {
         Map<QuoteSummaryModule, JsonNode> modules =
                 new QuoteSummaryEndpoint(client.session()).fetch(symbol, InfoMapper.INFO_MODULES);
         JsonNode quote = new QuoteEndpoint(client.session()).quote(symbol).orElse(null);
-        Double peg = timeseries().trailingPegRatio(symbol).orElse(null);
+        Double peg =
+                modules.isEmpty() ? null : timeseries().trailingPegRatio(symbol).orElse(null);
         return InfoMapper.map(symbol, modules, quote, peg);
     }
 

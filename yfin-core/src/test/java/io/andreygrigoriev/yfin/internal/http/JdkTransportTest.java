@@ -11,6 +11,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.ProxySelector;
 import java.net.ServerSocket;
 import java.net.URI;
 import java.net.http.HttpTimeoutException;
@@ -20,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
+import java.util.zip.DeflaterOutputStream;
 import java.util.zip.GZIPOutputStream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -53,6 +55,22 @@ class JdkTransportTest {
             try (var out = exchange.getResponseBody()) {
                 out.write(bytes);
             }
+        });
+        server.createContext("/deflate", exchange -> {
+            record(exchange);
+            var buffer = new ByteArrayOutputStream();
+            try (var deflate = new DeflaterOutputStream(buffer)) {
+                deflate.write("{\"deflated\":true}".getBytes(StandardCharsets.UTF_8));
+            }
+            sendEncoded(exchange, "deflate", buffer.toByteArray());
+        });
+        server.createContext("/brotli", exchange -> {
+            record(exchange);
+            sendEncoded(exchange, "br", new byte[] {1, 2, 3});
+        });
+        server.createContext("/corrupt-gzip", exchange -> {
+            record(exchange);
+            sendEncoded(exchange, "gzip", "not gzip at all".getBytes(StandardCharsets.UTF_8));
         });
         server.createContext("/set-cookie", exchange -> {
             record(exchange);
@@ -93,6 +111,14 @@ class JdkTransportTest {
         headers.forEach((name, value) -> exchange.getResponseHeaders().add(name, value));
         byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
         exchange.sendResponseHeaders(status, bytes.length);
+        try (var out = exchange.getResponseBody()) {
+            out.write(bytes);
+        }
+    }
+
+    private static void sendEncoded(HttpExchange exchange, String encoding, byte[] bytes) throws IOException {
+        exchange.getResponseHeaders().add("Content-Encoding", encoding);
+        exchange.sendResponseHeaders(200, bytes.length);
         try (var out = exchange.getResponseBody()) {
             out.write(bytes);
         }
@@ -159,6 +185,40 @@ class JdkTransportTest {
 
         assertThat(response.bodyAsString()).isEqualTo("{\"zipped\":true}");
         assertThat(response.header("Content-Encoding")).isEmpty();
+    }
+
+    @Test
+    void decodesDeflateBody() {
+        var response = transport.send(HttpRequest.get(uri("/deflate")));
+
+        assertThat(response.bodyAsString()).isEqualTo("{\"deflated\":true}");
+        assertThat(response.header("Content-Encoding")).isEmpty();
+    }
+
+    @Test
+    void unsupportedOrCorruptEncodingIsANonRetryableTransportException() {
+        assertThatThrownBy(() -> transport.send(HttpRequest.get(uri("/brotli"))))
+                .isInstanceOf(NonRetryableTransportException.class)
+                .hasMessageContaining("unsupported Content-Encoding 'br'");
+        assertThatThrownBy(() -> transport.send(HttpRequest.get(uri("/corrupt-gzip"))))
+                .isInstanceOf(NonRetryableTransportException.class)
+                .hasMessageContaining("cannot decode gzip body")
+                .hasCauseInstanceOf(IOException.class);
+    }
+
+    @Test
+    void routesRequestsThroughTheConfiguredProxy() {
+        var proxied = JdkTransport.builder()
+                .proxy(ProxySelector.of(new InetSocketAddress(
+                        InetAddress.getLoopbackAddress(), server.getAddress().getPort())))
+                .build();
+        try (proxied) {
+            // the host does not resolve: only the proxy (our server) can answer
+            var response = proxied.send(HttpRequest.get(URI.create("http://proxied.invalid/echo")));
+
+            assertThat(response.bodyAsString()).isEqualTo("echo:GET");
+            assertThat(header(received.get("/echo"), "Host")).contains("proxied.invalid");
+        }
     }
 
     @Test

@@ -18,10 +18,11 @@ import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
+import org.jspecify.annotations.Nullable;
 
 /**
- * Test {@link Transport} that replays canned responses. Rules match on method, URI path and
- * query parameters and are tried in registration order; the first match wins. A request that
+ * Test {@link Transport} that replays canned responses. Rules match on method, URI path, query
+ * parameters and, when {@link RuleBuilder#host} is set, the host; they are tried in registration order; the first match wins. A request that
  * matches no rule fails loudly with an {@link AssertionError} listing the registered rules.
  *
  * <p>Fixtures are files under a fixture root, by default {@code src/test/resources/fixtures}
@@ -136,6 +137,7 @@ public final class FakeTransport implements Transport {
     private final class Rule {
         private final String description;
         private final String method;
+        private final @Nullable String host;
         private final String path;
         private final Predicate<Map<String, List<String>>> queryPredicate;
         private final List<Supplier<HttpResponse>> responses;
@@ -144,11 +146,13 @@ public final class FakeTransport implements Transport {
         Rule(
                 String description,
                 String method,
+                @Nullable String host,
                 String path,
                 Predicate<Map<String, List<String>>> queryPredicate,
                 List<Supplier<HttpResponse>> responses) {
             this.description = description;
             this.method = method;
+            this.host = host;
             this.path = path;
             this.queryPredicate = queryPredicate;
             this.responses = List.copyOf(responses);
@@ -156,6 +160,7 @@ public final class FakeTransport implements Transport {
 
         boolean matches(HttpRequest request, Map<String, List<String>> query) {
             return request.method().equals(method)
+                    && (host == null || host.equalsIgnoreCase(request.uri().getHost()))
                     && path.equals(request.uri().getPath())
                     && queryPredicate.test(query);
         }
@@ -172,6 +177,7 @@ public final class FakeTransport implements Transport {
     public final class RuleBuilder {
         private final String method;
         private final String path;
+        private @Nullable String host;
         private final StringBuilder description;
         private Predicate<Map<String, List<String>>> queryPredicate = q -> true;
         private final List<Supplier<HttpResponse>> responses = new ArrayList<>();
@@ -180,6 +186,13 @@ public final class FakeTransport implements Transport {
             this.method = method.toUpperCase(Locale.ROOT);
             this.path = Objects.requireNonNull(path, "path");
             this.description = new StringBuilder(this.method).append(' ').append(path);
+        }
+
+        /** Requires the request URI host to be {@code host} (case-insensitive). */
+        public RuleBuilder host(String host) {
+            this.host = Objects.requireNonNull(host, "host");
+            description.append(" @").append(host);
+            return this;
         }
 
         /** Requires query parameter {@code name} to have exactly the single value {@code value}. */
@@ -239,7 +252,7 @@ public final class FakeTransport implements Transport {
             if (responses.isEmpty()) {
                 throw new IllegalStateException("rule " + description + " has no response");
             }
-            rules.add(new Rule(description.toString(), method, path, queryPredicate, responses));
+            rules.add(new Rule(description.toString(), method, host, path, queryPredicate, responses));
             return FakeTransport.this;
         }
 

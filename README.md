@@ -95,10 +95,18 @@ YFinance yf = YFinance.builder()
         .maxConcurrentRequests(8)                   // default 8
         .maxRetries(2)                              // retries on 429/5xx, default 2
         .proxy(ProxySelector.of(new InetSocketAddress("proxy.local", 3128)))
+        .userAgent("Mozilla/5.0 ...")               // default: a desktop Chrome User-Agent
         .cacheDir(Path.of("/var/cache/yfin"))       // or .cache(Cache.none())
-        .repair(true)                               // price repair on by default for history()
+        .repair(true)                               // price repair for history(); off by default
         .build();
 ```
+
+`Transport` (`io.andreygrigoriev.yfin.spi`) is a public SPI for the HTTP layer: pass your own with
+`.transport(myTransport)` to change TLS, add logging or headers, or stub Yahoo in tests. With a
+custom transport, `proxy`, `connectTimeout`, `requestTimeout` and `userAgent` are ignored, since
+they configure the default JDK transport. A transport that manages cookies itself (or wraps one
+that does) should return its store from `Transport.cookieStore()`; otherwise yfin keeps the Yahoo
+cookies and sends the `Cookie` header itself.
 
 Data conventions:
 - Time-series prices are `double`. A missing value is `Double.NaN`. A missing volume is `0`.
@@ -329,6 +337,7 @@ messages. Logger names are class names under `io.andreygrigoriev.yfin`:
 | `io.andreygrigoriev.yfin.internal.http.YahooSession` | cookie/crumb bootstrap, consent flow, refresh |
 | `io.andreygrigoriev.yfin.internal.endpoint` | per-endpoint requests and payload issues |
 | `io.andreygrigoriev.yfin.internal.repair` | price repair decisions |
+| `io.andreygrigoriev.yfin.internal.cache.FileCache` | cache file read/write problems (warn; the cache then ignores the file) |
 | `io.andreygrigoriev.yfin.live.LiveStream` | connect, reconnect, decode errors |
 
 This replaces yfinance's `enable_debug_mode()`. For example, with Logback:

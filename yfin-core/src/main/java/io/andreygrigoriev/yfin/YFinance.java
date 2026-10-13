@@ -1,6 +1,5 @@
 package io.andreygrigoriev.yfin;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.andreygrigoriev.yfin.exception.YFDownloadException;
 import io.andreygrigoriev.yfin.exception.YFTransportException;
 import io.andreygrigoriev.yfin.exception.YFinanceException;
@@ -11,7 +10,6 @@ import io.andreygrigoriev.yfin.internal.endpoint.search.SearchEndpoint;
 import io.andreygrigoriev.yfin.internal.http.JdkTransport;
 import io.andreygrigoriev.yfin.internal.http.RequestLimiter;
 import io.andreygrigoriev.yfin.internal.http.RetryPolicy;
-import io.andreygrigoriev.yfin.internal.http.YahooJson;
 import io.andreygrigoriev.yfin.internal.http.YahooSession;
 import io.andreygrigoriev.yfin.model.LookupResult;
 import io.andreygrigoriev.yfin.model.PriceHistory;
@@ -114,7 +112,7 @@ public final class YFinance implements AutoCloseable {
     /**
      * Handle for {@code symbol}, trimmed and upper-cased. No request is made.
      *
-     * @throws IllegalArgumentException when {@code symbol} is blank
+     * @throws IllegalArgumentException when {@code symbol} is blank or consists of dots only
      * @throws IllegalStateException when the client is closed
      */
     public Ticker ticker(String symbol) {
@@ -415,12 +413,6 @@ public final class YFinance implements AutoCloseable {
         return s;
     }
 
-    /** The shared JSON mapper. */
-    ObjectMapper mapper() {
-        ensureOpen();
-        return YahooJson.mapper();
-    }
-
     Cache cache() {
         ensureOpen();
         return cache;
@@ -467,6 +459,10 @@ public final class YFinance implements AutoCloseable {
         String s = Objects.requireNonNull(symbol, "symbol").trim();
         if (s.isEmpty()) {
             throw new IllegalArgumentException("symbol is blank");
+        }
+        if (s.chars().allMatch(c -> c == '.')) {
+            // "." and ".." would become relative path segments of the endpoint URIs
+            throw new IllegalArgumentException("symbol consists of dots only: " + s);
         }
         return s.toUpperCase(Locale.ROOT);
     }

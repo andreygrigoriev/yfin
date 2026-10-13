@@ -1,5 +1,8 @@
 package io.andreygrigoriev.yfin.internal.endpoint.domain;
 
+import static io.andreygrigoriev.yfin.internal.http.YahooJson.plainMap;
+import static io.andreygrigoriev.yfin.internal.http.YahooJson.text;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import io.andreygrigoriev.yfin.exception.YFDataException;
 import io.andreygrigoriev.yfin.exception.YFSymbolNotFoundException;
@@ -88,29 +91,9 @@ final class DomainJson {
                 continue;
             }
             out.add(new TopCompany(
-                    symbol, text(c.path("name")), text(c.path("rating")), number(c.path("marketWeight")), map(c)));
+                    symbol, text(c.path("name")), text(c.path("rating")), number(c.path("marketWeight")), plainMap(c)));
         }
         return out;
-    }
-
-    static List<Map<String, Object>> maps(JsonNode array) {
-        var out = new ArrayList<Map<String, Object>>(array.size());
-        for (JsonNode element : array) {
-            if (element.isObject()) {
-                out.add(map(element));
-            }
-        }
-        return out;
-    }
-
-    @SuppressWarnings("unchecked")
-    static Map<String, Object> map(JsonNode node) {
-        Object value = YahooJson.toPlain(node);
-        return value instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
-    }
-
-    static @Nullable String text(JsonNode node) {
-        return node.isTextual() && !node.asText().isEmpty() ? node.asText() : null;
     }
 
     /** A plain number, or the {@code raw} member of Yahoo's {@code {"raw":…,"fmt":…}} form. */

@@ -2,7 +2,10 @@ package io.andreygrigoriev.yfin.internal.repair;
 
 import static io.andreygrigoriev.yfin.internal.repair.RepairCsv.assertColumnClose;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.andreygrigoriev.yfin.exception.YFRateLimitException;
+import io.andreygrigoriev.yfin.exception.YFTransportException;
 import io.andreygrigoriev.yfin.internal.repair.Frame.Col;
 import io.andreygrigoriev.yfin.request.Interval;
 import java.time.Clock;
@@ -124,6 +127,39 @@ class PriceRepairTest {
             assertColumnClose("weekly", repaired, bad, c, 0);
         }
         assertThat(repaired.repaired()).doesNotContain(true);
+    }
+
+    @Test
+    void rateLimitAndInterruptDuringFinerFetchPropagateOtherFailuresAreSkipped() {
+        Frame bad = weekly.copy();
+        for (Col c : Frame.PRICES) {
+            bad.set(c, 7, Double.NaN);
+        }
+        bad.set(Col.VOLUME, 7, 0);
+
+        var limited = new YFRateLimitException("HTTP 429");
+        assertThatThrownBy(() -> Zeroes.fix(bad, Interval.ONE_WEEK, false, failingFiner(limited)))
+                .isSameAs(limited);
+        var interrupted = new YFTransportException("interrupted", new InterruptedException());
+        assertThatThrownBy(() -> Zeroes.fix(bad, Interval.ONE_WEEK, false, failingFiner(interrupted)))
+                .isSameAs(interrupted);
+
+        Frame repaired =
+                Zeroes.fix(bad, Interval.ONE_WEEK, false, failingFiner(new YFTransportException("connection reset")));
+        assertThat(repaired.repaired()).doesNotContain(true);
+    }
+
+    private static RepairContext failingFiner(RuntimeException failure) {
+        return new RepairContext(
+                "CALM",
+                NY,
+                "USD",
+                null,
+                CLOCK,
+                (s, a, b, p, o) -> {
+                    throw failure;
+                },
+                null);
     }
 
     @Test

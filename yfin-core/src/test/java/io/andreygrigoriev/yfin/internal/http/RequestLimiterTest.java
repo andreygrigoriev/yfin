@@ -55,6 +55,89 @@ class RequestLimiterTest {
     }
 
     @Test
+    void admitsExactlyPermitCountConcurrentlyAndBlocksTheNext() throws Exception {
+        var limiter = new RequestLimiter(4);
+        var inside = new CountDownLatch(4);
+        var release = new CountDownLatch(1);
+        var fifthEntered = new AtomicBoolean();
+        var holders = new ArrayList<Thread>();
+        for (int i = 0; i < 4; i++) {
+            holders.add(Thread.ofVirtual()
+                    .start(() -> limiter.call(() -> {
+                        inside.countDown();
+                        await(release);
+                        return null;
+                    })));
+        }
+        assertThat(inside.await(5, TimeUnit.SECONDS))
+                .as("4 calls inside at once")
+                .isTrue();
+        assertThat(limiter.availablePermits()).isZero();
+
+        Thread fifth = Thread.ofVirtual()
+                .start(() -> limiter.call(() -> {
+                    fifthEntered.set(true);
+                    return null;
+                }));
+        awaitWaiting(fifth);
+        assertThat(fifthEntered).isFalse();
+
+        release.countDown();
+        fifth.join(5_000);
+        for (Thread t : holders) {
+            t.join(5_000);
+        }
+        assertThat(fifthEntered).isTrue();
+        assertThat(limiter.availablePermits()).isEqualTo(4);
+    }
+
+    @Test
+    void waitersAreServedInArrivalOrder() throws Exception {
+        var limiter = new RequestLimiter(1);
+        var holding = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        var order = new java.util.concurrent.ConcurrentLinkedQueue<String>();
+        Thread holder = Thread.ofVirtual()
+                .start(() -> limiter.call(() -> {
+                    holding.countDown();
+                    await(release);
+                    return null;
+                }));
+        holding.await();
+        var waiters = new ArrayList<Thread>();
+        for (String name : new String[] {"a", "b", "c"}) {
+            Thread t = Thread.ofVirtual().start(() -> limiter.call(() -> order.add(name)));
+            awaitWaiting(t); // queued before the next one starts
+            waiters.add(t);
+        }
+
+        release.countDown();
+        holder.join(5_000);
+        for (Thread t : waiters) {
+            t.join(5_000);
+        }
+        assertThat(order).containsExactly("a", "b", "c");
+    }
+
+    private static void await(CountDownLatch latch) {
+        try {
+            latch.await();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private static void awaitWaiting(Thread t) {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (t.getState() != Thread.State.WAITING) {
+            if (System.nanoTime() > deadline) {
+                throw new AssertionError(t + " never blocked");
+            }
+            Thread.onSpinWait();
+        }
+    }
+
+    @Test
     void releasesPermitWhenCallThrows() {
         var limiter = new RequestLimiter(1);
 

@@ -142,16 +142,6 @@ public final class Frame {
                 .toArray();
     }
 
-    /** Whether rows are in ascending time order. */
-    public boolean isAscending() {
-        for (int i = 1; i < size(); i++) {
-            if (time[i].toInstant().isBefore(time[i - 1].toInstant())) {
-                return false;
-            }
-        }
-        return true;
-    }
-
     /** Rows of {@code a} followed by rows of {@code b}. */
     public static Frame concat(Frame a, Frame b) {
         int n = a.size() + b.size();
@@ -188,15 +178,6 @@ public final class Frame {
 
     public int indexOf(ZonedDateTime t) {
         return indexOf(t.toInstant());
-    }
-
-    /** Number of rows (of a sorted table) at or before {@code t}: pandas {@code df.loc[:t]}. */
-    public int countUpTo(Instant t) {
-        int k = 0;
-        while (k < time.length && !time[k].toInstant().isAfter(t)) {
-            k++;
-        }
-        return k;
     }
 
     /** Positions where {@code mask} is true. */

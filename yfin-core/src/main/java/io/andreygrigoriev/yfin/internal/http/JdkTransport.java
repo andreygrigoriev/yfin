@@ -89,7 +89,7 @@ public final class JdkTransport implements Transport, AutoCloseable {
         this.requestTimeout = builder.requestTimeout;
         this.userAgent = builder.userAgent;
         var clientBuilder = HttpClient.newBuilder()
-                .version(builder.version)
+                .version(HttpClient.Version.HTTP_2)
                 .connectTimeout(builder.connectTimeout)
                 .followRedirects(HttpClient.Redirect.NORMAL)
                 .cookieHandler(cookieManager)
@@ -112,6 +112,7 @@ public final class JdkTransport implements Transport, AutoCloseable {
     }
 
     /** The in-memory cookie store, for the session to persist and restore cookies. */
+    @Override
     public CookieStore cookieStore() {
         return cookieManager.getCookieStore();
     }
@@ -132,7 +133,7 @@ public final class JdkTransport implements Transport, AutoCloseable {
             throw new YFTransportException("I/O error: " + describe(request) + ": " + e, e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new YFTransportException("interrupted: " + describe(request), e);
+            throw new NonRetryableTransportException("interrupted: " + describe(request), e);
         }
         return fromJdk(request, response);
     }
@@ -191,11 +192,12 @@ public final class JdkTransport implements Transport, AutoCloseable {
             case "gzip", "x-gzip" -> new GZIPInputStream(new ByteArrayInputStream(body));
             case "deflate" -> new InflaterInputStream(new ByteArrayInputStream(body));
             default ->
-                throw new YFTransportException("unsupported Content-Encoding '" + encoding + "': " + describe(request));
+                throw new NonRetryableTransportException(
+                        "unsupported Content-Encoding '" + encoding + "': " + describe(request), null);
         }) {
             return in.readAllBytes();
         } catch (IOException e) {
-            throw new YFTransportException("cannot decode " + encoding + " body: " + describe(request), e);
+            throw new NonRetryableTransportException("cannot decode " + encoding + " body: " + describe(request), e);
         }
     }
 
@@ -236,7 +238,6 @@ public final class JdkTransport implements Transport, AutoCloseable {
         private Duration requestTimeout = Duration.ofSeconds(30);
         private @Nullable ProxySelector proxy;
         private String userAgent = DEFAULT_USER_AGENT;
-        private HttpClient.Version version = HttpClient.Version.HTTP_2;
 
         private Builder() {}
 
@@ -263,12 +264,6 @@ public final class JdkTransport implements Transport, AutoCloseable {
                 throw new IllegalArgumentException("userAgent is blank");
             }
             this.userAgent = userAgent;
-            return this;
-        }
-
-        /** Preferred HTTP version; HTTP/2 by default. */
-        public Builder version(HttpClient.Version version) {
-            this.version = Objects.requireNonNull(version, "version");
             return this;
         }
 

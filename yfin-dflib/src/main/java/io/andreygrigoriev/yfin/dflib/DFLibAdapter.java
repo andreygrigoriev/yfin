@@ -15,6 +15,7 @@ import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.DoubleBinaryOperator;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.ToDoubleFunction;
@@ -68,15 +69,18 @@ public final class DFLibAdapter {
                 longs(bars, Bar::volume)));
         if (!history.dividends().isEmpty()) {
             names.add("Dividends");
-            columns.add(eventSeries(bars, interval, history.dividends(), Dividend::time, Dividend::amount));
+            columns.add(eventSeries(
+                    bars, interval, history.dividends(), Dividend::time, Dividend::amount, DFLibAdapter::sum));
         }
         if (!history.splits().isEmpty()) {
             names.add("Stock Splits");
-            columns.add(eventSeries(bars, interval, history.splits(), Split::time, Split::ratio));
+            columns.add(
+                    eventSeries(bars, interval, history.splits(), Split::time, Split::ratio, DFLibAdapter::product));
         }
         if (!history.capitalGains().isEmpty()) {
             names.add("Capital Gains");
-            columns.add(eventSeries(bars, interval, history.capitalGains(), CapitalGain::time, CapitalGain::amount));
+            columns.add(eventSeries(
+                    bars, interval, history.capitalGains(), CapitalGain::time, CapitalGain::amount, DFLibAdapter::sum));
         }
         if (bars.stream().anyMatch(Bar::repaired)) {
             names.add("Repaired?");
@@ -215,15 +219,29 @@ public final class DFLibAdapter {
             Interval interval,
             List<E> events,
             Function<E, ZonedDateTime> timeOf,
-            ToDoubleFunction<E> valueOf) {
+            ToDoubleFunction<E> valueOf,
+            DoubleBinaryOperator merge) {
         double[] values = new double[bars.size()];
         for (E event : events) {
             int i = barIndex(bars, timeOf.apply(event), interval);
             if (i >= 0) {
-                values[i] += valueOf.applyAsDouble(event);
+                values[i] = merge.applyAsDouble(values[i], valueOf.applyAsDouble(event));
             }
         }
         return Series.ofDouble(values);
+    }
+
+    /** Sums amounts (dividends, capital gains) of events that fall on one bar. */
+    private static double sum(double merged, double value) {
+        return merged + value;
+    }
+
+    /**
+     * Multiplies split ratios that fall on one bar, as yfinance's {@code replace(0, 1).prod()}:
+     * a 2:1 and a 3:1 split in one weekly bar give 6, not 5.
+     */
+    private static double product(double merged, double value) {
+        return merged == 0 ? value : merged * (value == 0 ? 1 : value);
     }
 
     /** Index of the bar an event belongs to, {@code -1} when none. */

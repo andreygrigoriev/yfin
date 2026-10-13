@@ -1,5 +1,9 @@
 package io.andreygrigoriev.yfin.internal.endpoint.domain;
 
+import static io.andreygrigoriev.yfin.internal.http.YahooJson.plainMap;
+import static io.andreygrigoriev.yfin.internal.http.YahooJson.plainMaps;
+import static io.andreygrigoriev.yfin.internal.http.YahooJson.text;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import io.andreygrigoriev.yfin.exception.YFDataException;
 import io.andreygrigoriev.yfin.exception.YFSymbolNotFoundException;
@@ -34,26 +38,26 @@ public final class SectorEndpoint {
     }
 
     static SectorData parse(String key, JsonNode data) {
-        String k = DomainJson.text(data.path("key"));
+        String k = text(data.path("key"));
         return new SectorData(
                 k != null ? k : key,
-                DomainJson.text(data.path("name")),
-                DomainJson.text(data.path("symbol")),
+                text(data.path("name")),
+                text(data.path("symbol")),
                 DomainJson.overview(data.path("overview")),
                 DomainJson.topCompanies(data.path("topCompanies")),
                 symbolNames(data.path("topETFs")),
                 symbolNames(data.path("topMutualFunds")),
                 industries(data.path("industries")),
-                DomainJson.maps(data.path("researchReports")),
-                DomainJson.map(data));
+                plainMaps(data.path("researchReports")),
+                plainMap(data));
     }
 
     private static Map<String, String> symbolNames(JsonNode array) {
         var out = new LinkedHashMap<String, String>();
         for (JsonNode e : array) {
-            String symbol = DomainJson.text(e.path("symbol"));
+            String symbol = text(e.path("symbol"));
             if (symbol != null) {
-                String name = DomainJson.text(e.path("name"));
+                String name = text(e.path("name"));
                 out.put(symbol, name != null ? name : symbol);
             }
         }
@@ -63,13 +67,12 @@ public final class SectorEndpoint {
     private static List<SectorIndustry> industries(JsonNode array) {
         var out = new ArrayList<SectorIndustry>(array.size());
         for (JsonNode i : array) {
-            String key = DomainJson.text(i.path("key"));
-            String name = DomainJson.text(i.path("name"));
+            String key = text(i.path("key"));
+            String name = text(i.path("name"));
             if (key == null || ALL_INDUSTRIES.equals(name)) {
                 continue;
             }
-            out.add(new SectorIndustry(
-                    key, name, DomainJson.text(i.path("symbol")), DomainJson.number(i.path("marketWeight"))));
+            out.add(new SectorIndustry(key, name, text(i.path("symbol")), DomainJson.number(i.path("marketWeight"))));
         }
         return out;
     }

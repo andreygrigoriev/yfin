@@ -2,8 +2,8 @@ package io.andreygrigoriev.yfin.it;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.andreygrigoriev.yfin.FastInfo;
 import io.andreygrigoriev.yfin.YFinance;
-import io.andreygrigoriev.yfin.model.FastInfo;
 import io.andreygrigoriev.yfin.model.FundsData;
 import io.andreygrigoriev.yfin.model.SecFiling;
 import io.andreygrigoriev.yfin.model.TickerInfo;

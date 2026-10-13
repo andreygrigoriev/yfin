@@ -17,7 +17,10 @@ import java.net.ServerSocket;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
@@ -235,6 +238,61 @@ class LiveStreamTest {
     }
 
     @Test
+    void concurrentSubscribesAllArriveAndLastFrameHasWholeSet() throws Exception {
+        try (LiveStream stream = builder().connect(recorder)) {
+            var conn = server.awaitConnection(TIMEOUT);
+            int threads = 8;
+            var start = new CountDownLatch(1);
+            List<Thread> workers = new ArrayList<>();
+            for (int i = 0; i < threads; i++) {
+                String symbol = "SYM" + i;
+                workers.add(Thread.ofVirtual().start(() -> {
+                    try {
+                        start.await();
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                    stream.subscribe(symbol);
+                }));
+            }
+            start.countDown();
+            for (Thread t : workers) {
+                t.join(TIMEOUT);
+            }
+
+            assertThat(stream.subscriptions()).hasSize(threads);
+            String last = null;
+            for (int i = 0; i < threads; i++) {
+                last = conn.receive(TIMEOUT);
+            }
+            // frames are snapshotted and sent in order, so the last one carries every symbol
+            for (int i = 0; i < threads; i++) {
+                assertThat(last).contains("\"SYM" + i + "\"");
+            }
+            assertThat(recorder.errors).isEmpty();
+        }
+    }
+
+    @Test
+    void backoffGrowsWhenServerDropsEveryConnectionBeforeAFrame() throws Exception {
+        try (LiveStream stream = YFinanceLive.builder(yf)
+                .uri(server.uri())
+                .reconnectDelay(Duration.ofMillis(100), Duration.ofSeconds(2))
+                .connect(recorder)) {
+            long[] acceptedAt = new long[4];
+            for (int i = 0; i < acceptedAt.length; i++) {
+                var conn = server.awaitConnection(TIMEOUT);
+                acceptedAt[i] = System.nanoTime();
+                conn.drop();
+            }
+            // attempt n waits at least half of 100ms * 2^(n-1): the third reconnect waits >= 200ms;
+            // without growth every wait would stay below 100ms
+            assertThat(Duration.ofNanos(acceptedAt[3] - acceptedAt[2])).isGreaterThanOrEqualTo(Duration.ofMillis(200));
+            assertThat(stream.isClosed()).isFalse();
+        }
+    }
+
+    @Test
     void closeEndsConnectionAndStopsReconnecting() throws Exception {
         LiveStream stream = builder().connect(recorder);
         var conn = server.awaitConnection(TIMEOUT);
@@ -248,7 +306,7 @@ class LiveStreamTest {
         assertThat(stream.isConnected()).isFalse();
         assertThatIllegalStateException().isThrownBy(() -> stream.subscribe("MSFT"));
         assertThatIllegalStateException().isThrownBy(() -> stream.unsubscribe("AAPL"));
-        Thread.sleep(200);
+        Thread.sleep(200); // 4x the 50ms maximum reconnect delay of builder()
         assertThat(server.connectionCount()).isEqualTo(1);
         assertThat(recorder.errors).isEmpty();
     }

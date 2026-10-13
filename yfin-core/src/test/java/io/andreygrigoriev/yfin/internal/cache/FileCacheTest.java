@@ -8,6 +8,7 @@ import io.andreygrigoriev.yfin.spi.Cache;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -110,6 +111,42 @@ class FileCacheTest {
         var cache = new FileCache(tmp);
         assertThatThrownBy(() -> cache.put("../evil", "k", "v")).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> cache.get("", "k")).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void twoInstancesOnOneDirectoryKeepEachOthersEntries() throws Exception {
+        var first = new FileCache(tmp);
+        var second = new FileCache(tmp);
+        first.get("tz", "warm-up"); // both load the (empty) file before anyone writes
+        second.get("tz", "warm-up");
+        var start = new CountDownLatch(1);
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var futures = new ArrayList<Future<?>>();
+            for (var cache : List.of(first, second)) {
+                String prefix = cache == first ? "a" : "b";
+                futures.add(executor.submit(() -> {
+                    start.await();
+                    for (int i = 0; i < 50; i++) {
+                        cache.put("tz", prefix + i, "v" + i);
+                    }
+                    return null;
+                }));
+            }
+            start.countDown();
+            for (var f : futures) {
+                f.get();
+            }
+        }
+        second.invalidate("tz", "a0");
+
+        var reopened = new FileCache(tmp);
+        for (int i = 0; i < 50; i++) {
+            assertThat(reopened.get("tz", "b" + i)).contains("v" + i);
+            if (i > 0) {
+                assertThat(reopened.get("tz", "a" + i)).contains("v" + i);
+            }
+        }
+        assertThat(reopened.get("tz", "a0")).isEmpty();
     }
 
     @Test

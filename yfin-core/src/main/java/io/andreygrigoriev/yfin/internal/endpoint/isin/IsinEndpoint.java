@@ -7,6 +7,10 @@ import io.andreygrigoriev.yfin.spi.Cache;
 import io.andreygrigoriev.yfin.spi.HttpRequest;
 import io.andreygrigoriev.yfin.spi.HttpResponse;
 import java.net.URI;
+import java.time.Clock;
+import java.time.DateTimeException;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
@@ -16,9 +20,10 @@ import org.slf4j.LoggerFactory;
 
 /**
  * ISIN of a symbol, ported from yfinance's experimental {@code get_isin}: the Business Insider
- * search suggestions for the symbol's short name, searched for {@code "SYMBOL|<isin>|…}. Results,
- * including "none" ({@code -}), are cached in the {@code isin} namespace. The request goes out
- * without the Yahoo crumb.
+ * search suggestions for the symbol's short name, searched for {@code "SYMBOL|<isin>|…}. Results
+ * are cached in the {@code isin} namespace: an ISIN for good, "none" ({@code -@<epoch second>})
+ * for {@link #NONE_TTL} only, so one bad answer does not disable the lookup forever. The request
+ * goes out without the Yahoo crumb.
  */
 public final class IsinEndpoint {
 
@@ -26,20 +31,29 @@ public final class IsinEndpoint {
 
     static final String CACHE_NAMESPACE = "isin";
     static final String NONE = "-";
+    /** How long a "no ISIN" answer is cached. */
+    static final Duration NONE_TTL = Duration.ofDays(1);
+
     static final String URL = "https://markets.businessinsider.com/ajax/SearchController_Suggest?max_results=25&query=";
 
     private final YahooSession session;
     private final Cache cache;
     private final Function<String, Optional<String>> shortNames;
+    private final Clock clock;
 
     /**
      * @param shortNames Yahoo quote lookup of a symbol: empty when Yahoo has no quote, otherwise
      *     its short name, or the symbol itself when the quote has no short name
      */
     public IsinEndpoint(YahooSession session, Cache cache, Function<String, Optional<String>> shortNames) {
+        this(session, cache, shortNames, Clock.systemUTC());
+    }
+
+    IsinEndpoint(YahooSession session, Cache cache, Function<String, Optional<String>> shortNames, Clock clock) {
         this.session = Objects.requireNonNull(session, "session");
         this.cache = Objects.requireNonNull(cache, "cache");
         this.shortNames = Objects.requireNonNull(shortNames, "shortNames");
+        this.clock = Objects.requireNonNull(clock, "clock");
     }
 
     /**
@@ -54,7 +68,13 @@ public final class IsinEndpoint {
         }
         Optional<String> cached = cache.get(CACHE_NAMESPACE, ticker);
         if (cached.isPresent()) {
-            return found(cached.get());
+            String value = cached.get();
+            if (!value.startsWith(NONE)) {
+                return Optional.of(value);
+            }
+            if (isFreshNone(value)) {
+                return Optional.empty();
+            }
         }
         Optional<String> query = shortNames.apply(ticker);
         if (query.isEmpty()) {
@@ -68,8 +88,31 @@ public final class IsinEndpoint {
             throw new YFDataException("ISIN lookup: HTTP " + response.status(), response.body(), null);
         }
         String isin = parse(response.bodyAsString(), ticker, query.get());
+        if (NONE.equals(isin)) {
+            cache.put(CACHE_NAMESPACE, ticker, noneEntry(clock.instant()));
+            return Optional.empty();
+        }
         cache.put(CACHE_NAMESPACE, ticker, isin);
-        return found(isin);
+        return Optional.of(isin);
+    }
+
+    /** Cache value of a "no ISIN" answer received at {@code at}. */
+    static String noneEntry(Instant at) {
+        return NONE + "@" + at.getEpochSecond();
+    }
+
+    /** Whether {@code value} is a "no ISIN" entry younger than {@link #NONE_TTL}. */
+    private boolean isFreshNone(String value) {
+        int at = value.indexOf('@');
+        if (at < 0) {
+            return false; // no timestamp: treat as expired
+        }
+        try {
+            Instant stored = Instant.ofEpochSecond(Long.parseLong(value.substring(at + 1)));
+            return stored.plus(NONE_TTL).isAfter(clock.instant());
+        } catch (NumberFormatException | DateTimeException e) {
+            return false;
+        }
     }
 
     /**
@@ -95,9 +138,5 @@ public final class IsinEndpoint {
         int bar = keywords.indexOf('|');
         String isin = bar < 0 ? keywords : keywords.substring(0, bar);
         return isin.isEmpty() ? NONE : isin;
-    }
-
-    private static Optional<String> found(String value) {
-        return NONE.equals(value) ? Optional.empty() : Optional.of(value);
     }
 }

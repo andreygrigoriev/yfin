@@ -137,6 +137,26 @@ class RetryPolicyTest {
     }
 
     @Test
+    void deterministicAndInterruptedTransportFailuresAreNotRetried() {
+        var decode = new NonRetryableTransportException("cannot decode gzip body", null);
+        var script = new Script(decode);
+        assertThatThrownBy(() -> policy(3).execute(script)).isSameAs(decode);
+        assertThat(script.calls).isEqualTo(1);
+
+        var interrupted = new YFTransportException("interrupted", new InterruptedException());
+        var script2 = new Script(interrupted);
+        assertThatThrownBy(() -> policy(3).execute(script2)).isSameAs(interrupted);
+        assertThat(script2.calls).isEqualTo(1);
+
+        var reset = new YFTransportException("reset");
+        var script3 = new Script(reset);
+        Thread.currentThread().interrupt();
+        assertThatThrownBy(() -> policy(3).execute(script3)).isSameAs(reset);
+        assertThat(script3.calls).isEqualTo(1);
+        assertThat(sleeps).isEmpty();
+    }
+
+    @Test
     void zeroRetriesMakesSingleAttempt() {
         var script = new Script(status(429));
 

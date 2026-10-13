@@ -8,8 +8,10 @@ import io.andreygrigoriev.yfin.exception.YFDataException;
 import io.andreygrigoriev.yfin.internal.cache.FileCache;
 import io.andreygrigoriev.yfin.spi.Cache;
 import io.andreygrigoriev.yfin.spi.HttpRequest;
+import io.andreygrigoriev.yfin.spi.HttpResponse;
 import io.andreygrigoriev.yfin.testing.FakeTransport;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
@@ -70,10 +72,64 @@ class IsinEndpointTest {
 
     @Test
     void cachedNoneIsEmptyWithoutRequests() {
-        cache.put("isin", "SAP.DE", "-");
+        cache.put("isin", "SAP.DE", IsinEndpoint.noneEntry(Instant.now()));
 
         assertThat(yf.ticker("SAP.DE").isin()).isEmpty();
         assertThat(fake.requests()).isEmpty();
+    }
+
+    @Test
+    void expiredOrUntimedNoneIsLookedUpAgain() {
+        fake.onGet(QUOTE).query("symbols", "AAPL").respondFixture("quote/aapl.json");
+        fake.onGet(SUGGEST).respondFixture("isin/aapl.txt");
+
+        cache.put("isin", "AAPL", IsinEndpoint.noneEntry(Instant.now().minus(IsinEndpoint.NONE_TTL.plusMinutes(1))));
+        assertThat(yf.ticker("AAPL").isin()).contains("US0378331005");
+        assertThat(suggestRequests()).hasSize(1);
+
+        fake.clearRequests();
+        cache.put("isin", "AAPL", "-"); // bare marker of an older version: no timestamp
+        assertThat(yf.ticker("AAPL").isin()).contains("US0378331005");
+        assertThat(suggestRequests()).hasSize(1);
+    }
+
+    @Test
+    void yahooCookiesAreNotSentToBusinessInsiderNorPersistedFromIt() throws Exception {
+        var transport = FakeTransport.create();
+        transport
+                .onGet("")
+                .host("fc.yahoo.com")
+                .respond(new HttpResponse(
+                        404, Map.of("Set-Cookie", List.of("A3=yahoo-secret; Domain=.yahoo.com; Path=/")), new byte[0]));
+        transport.onGet("/v1/test/getcrumb").respond(200, "crumb1");
+        transport.onGet(QUOTE).query("symbols", "AAPL").respondFixture("quote/aapl.json");
+        transport
+                .onGet(SUGGEST)
+                .respond(new HttpResponse(
+                        200,
+                        Map.of("Set-Cookie", List.of("bi=tracker; Path=/")),
+                        java.nio.file.Files.readAllBytes(FakeTransport.DEFAULT_FIXTURE_ROOT.resolve("isin/aapl.txt"))));
+        try (YFinance client = YFinance.builder()
+                .transport(transport)
+                .cache(cache)
+                .maxRetries(0)
+                .build()) {
+            assertThat(client.ticker("AAPL").isin()).contains("US0378331005");
+        }
+
+        HttpRequest quote = transport.requests().stream()
+                .filter(r -> r.uri().getPath().equals(QUOTE))
+                .findFirst()
+                .orElseThrow();
+        assertThat(quote.headers().get("Cookie")).containsExactly("A3=yahoo-secret");
+        HttpRequest suggest = transport.requests().stream()
+                .filter(r -> r.uri().getPath().equals(SUGGEST))
+                .findFirst()
+                .orElseThrow();
+        assertThat(suggest.headers()).doesNotContainKey("Cookie");
+        assertThat(cache.get("cookie", "session"))
+                .hasValueSatisfying(
+                        session -> assertThat(session).contains("yahoo-secret").doesNotContain("tracker"));
     }
 
     @Test
@@ -83,7 +139,8 @@ class IsinEndpointTest {
         fake.onGet(SUGGEST).respondFixture("isin/sap-de.txt");
 
         assertThat(yf.ticker("SAP.DE").isin()).isEmpty();
-        assertThat(cache.get("isin", "SAP.DE")).contains("-");
+        assertThat(cache.get("isin", "SAP.DE"))
+                .hasValueSatisfying(v -> assertThat(v).startsWith("-@"));
 
         fake.clearRequests();
         assertThat(yf.ticker("SAP.DE").isin()).isEmpty();

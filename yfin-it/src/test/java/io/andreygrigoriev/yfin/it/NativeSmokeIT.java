@@ -13,17 +13,23 @@ import org.junit.jupiter.api.Test;
 /**
  * Runs the {@code native-smoke} executable built by {@code -Pnative} (history, info, statements
  * over HTTPS and a WebSocket stream, all in a native image) against live Yahoo. Skipped when the
- * executable was not built, i.e. without {@code -Pnative}.
+ * executable was not built, i.e. without {@code -Pnative}, unless {@code
+ * -Dnative.smoke.required=true} (set by the nightly workflow): then a missing executable fails.
  */
 class NativeSmokeIT {
 
     private static final Path EXECUTABLE =
             Path.of(System.getProperty("native.smoke.executable", "target/native-smoke"));
 
+    private static final boolean REQUIRED = Boolean.getBoolean("native.smoke.required");
+
     @Test
     void nativeExecutablePassesEveryCheck() throws IOException, InterruptedException {
-        Assumptions.assumeTrue(
-                Files.isExecutable(EXECUTABLE), "native-smoke not built (run with -Pnative): " + EXECUTABLE);
+        String missing = "native-smoke not built (run with -Pnative): " + EXECUTABLE.toAbsolutePath();
+        if (REQUIRED) {
+            assertThat(Files.isExecutable(EXECUTABLE)).as(missing).isTrue();
+        }
+        Assumptions.assumeTrue(Files.isExecutable(EXECUTABLE), missing);
 
         Process process = new ProcessBuilder(EXECUTABLE.toAbsolutePath().toString())
                 .redirectErrorStream(true)

@@ -9,7 +9,6 @@ import io.andreygrigoriev.yfin.internal.cache.FileCache;
 import io.andreygrigoriev.yfin.internal.http.JdkTransport;
 import io.andreygrigoriev.yfin.internal.http.RequestLimiter;
 import io.andreygrigoriev.yfin.internal.http.RetryPolicy;
-import io.andreygrigoriev.yfin.internal.http.YahooJson;
 import io.andreygrigoriev.yfin.spi.Cache;
 import io.andreygrigoriev.yfin.spi.HttpRequest;
 import io.andreygrigoriev.yfin.spi.HttpResponse;
@@ -45,7 +44,6 @@ class YFinanceTest {
             assertThat(yf.repair()).isFalse();
             assertThat(yf.proxy()).isEmpty();
             assertThat(yf.transport()).isInstanceOf(JdkTransport.class);
-            assertThat(yf.mapper()).isSameAs(YahooJson.mapper());
         }
     }
 
@@ -167,7 +165,6 @@ class YFinanceTest {
         assertThat(yf.isClosed()).isTrue();
         assertThatThrownBy(() -> yf.ticker("AAPL")).isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(yf::session).isInstanceOf(IllegalStateException.class);
-        assertThatThrownBy(yf::mapper).isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(yf::cache).isInstanceOf(IllegalStateException.class);
     }
 
@@ -216,8 +213,8 @@ class YFinanceTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"", " ", "\t\n"})
-    void tickerRejectsBlank(String symbol) {
+    @ValueSource(strings = {"", " ", "\t\n", ".", " .. "})
+    void tickerRejectsBlankAndDotOnly(String symbol) {
         try (YFinance yf = fakeClient()) {
             assertThatThrownBy(() -> yf.ticker(symbol)).isInstanceOf(IllegalArgumentException.class);
         }

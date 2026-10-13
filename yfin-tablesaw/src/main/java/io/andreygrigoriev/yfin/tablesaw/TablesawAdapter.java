@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.SortedMap;
+import java.util.function.DoubleBinaryOperator;
 import java.util.function.Function;
 import java.util.function.ToDoubleFunction;
 import org.jspecify.annotations.Nullable;
@@ -80,15 +81,34 @@ public final class TablesawAdapter {
         }
         Table table = Table.create(history.symbol(), time, open, high, low, close, adjClose, volume);
         if (!history.dividends().isEmpty()) {
-            table.addColumns(
-                    eventColumn("Dividends", bars, interval, history.dividends(), Dividend::time, Dividend::amount));
+            table.addColumns(eventColumn(
+                    "Dividends",
+                    bars,
+                    interval,
+                    history.dividends(),
+                    Dividend::time,
+                    Dividend::amount,
+                    TablesawAdapter::sum));
         }
         if (!history.splits().isEmpty()) {
-            table.addColumns(eventColumn("Stock Splits", bars, interval, history.splits(), Split::time, Split::ratio));
+            table.addColumns(eventColumn(
+                    "Stock Splits",
+                    bars,
+                    interval,
+                    history.splits(),
+                    Split::time,
+                    Split::ratio,
+                    TablesawAdapter::product));
         }
         if (!history.capitalGains().isEmpty()) {
             table.addColumns(eventColumn(
-                    "Capital Gains", bars, interval, history.capitalGains(), CapitalGain::time, CapitalGain::amount));
+                    "Capital Gains",
+                    bars,
+                    interval,
+                    history.capitalGains(),
+                    CapitalGain::time,
+                    CapitalGain::amount,
+                    TablesawAdapter::sum));
         }
         if (anyRepaired) {
             var repaired = BooleanColumn.create("Repaired?", n);
@@ -242,15 +262,29 @@ public final class TablesawAdapter {
             Interval interval,
             List<E> events,
             Function<E, ZonedDateTime> timeOf,
-            ToDoubleFunction<E> valueOf) {
+            ToDoubleFunction<E> valueOf,
+            DoubleBinaryOperator merge) {
         double[] values = new double[bars.size()];
         for (E event : events) {
             int i = barIndex(bars, timeOf.apply(event), interval);
             if (i >= 0) {
-                values[i] += valueOf.applyAsDouble(event);
+                values[i] = merge.applyAsDouble(values[i], valueOf.applyAsDouble(event));
             }
         }
         return DoubleColumn.create(name, values);
+    }
+
+    /** Sums amounts (dividends, capital gains) of events that fall on one bar. */
+    private static double sum(double merged, double value) {
+        return merged + value;
+    }
+
+    /**
+     * Multiplies split ratios that fall on one bar, as yfinance's {@code replace(0, 1).prod()}:
+     * a 2:1 and a 3:1 split in one weekly bar give 6, not 5.
+     */
+    private static double product(double merged, double value) {
+        return merged == 0 ? value : merged * (value == 0 ? 1 : value);
     }
 
     /** Index of the bar an event belongs to, {@code -1} when none. */

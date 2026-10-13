@@ -25,19 +25,24 @@ import org.slf4j.LoggerFactory;
  * {@link Cache} backed by one JSON object file per namespace ({@code <dir>/<namespace>.json}).
  *
  * <p>A namespace file is read lazily on first access and then served from memory. Every write
- * rewrites the whole namespace file through a temp file and an atomic move, so readers never see a
- * partial file. The directory is created on first write. A missing, unreadable or corrupt file is
+ * re-reads the file, applies its one change and rewrites the whole file through a temp file and an
+ * atomic move, so readers never see a partial file and writers do not drop entries another {@code
+ * FileCache} on the same directory wrote meanwhile. Writers in one JVM are serialized per file;
+ * across processes this is best effort (no file lock), so a truly simultaneous write can still win
+ * over another. The directory is created on first write. A missing, unreadable or corrupt file is
  * treated as empty (corruption is logged); I/O failures on write are logged and swallowed, as the
  * {@link Cache} contract requires.
  *
- * <p>Thread-safe: operations on the same namespace are serialized, different namespaces do not
- * block each other. Uses the Jackson tree model only, so no reflection metadata is needed.
+ * <p>Thread-safe: operations on the same namespace file are serialized (also across instances),
+ * different namespaces do not block each other. Uses the Jackson tree model only, so no reflection metadata is needed.
  */
 public final class FileCache implements Cache {
 
     private static final Logger LOG = LoggerFactory.getLogger(FileCache.class);
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final Pattern NAMESPACE = Pattern.compile("[A-Za-z0-9_-]+");
+    /** One monitor per namespace file, shared by every instance in this JVM. */
+    private static final ConcurrentHashMap<Path, Object> FILE_LOCKS = new ConcurrentHashMap<>();
 
     private final Path dir;
     private final ConcurrentHashMap<String, Namespace> namespaces = new ConcurrentHashMap<>();
@@ -71,7 +76,7 @@ public final class FileCache implements Cache {
     public Optional<String> get(String namespace, String key) {
         Objects.requireNonNull(key, "key");
         Namespace ns = namespace(namespace);
-        synchronized (ns) {
+        synchronized (ns.lock) {
             return Optional.ofNullable(ns.entries().get(key));
         }
     }
@@ -81,9 +86,9 @@ public final class FileCache implements Cache {
         Objects.requireNonNull(key, "key");
         Objects.requireNonNull(value, "value");
         Namespace ns = namespace(namespace);
-        synchronized (ns) {
-            if (!value.equals(ns.entries().put(key, value))) {
-                ns.write();
+        synchronized (ns.lock) {
+            if (!value.equals(ns.entries().get(key))) {
+                ns.update(key, value);
             }
         }
     }
@@ -92,10 +97,8 @@ public final class FileCache implements Cache {
     public void invalidate(String namespace, String key) {
         Objects.requireNonNull(key, "key");
         Namespace ns = namespace(namespace);
-        synchronized (ns) {
-            if (ns.entries().remove(key) != null) {
-                ns.write();
-            }
+        synchronized (ns.lock) {
+            ns.update(key, null); // checks the file: another instance may have written the key
         }
     }
 
@@ -107,13 +110,15 @@ public final class FileCache implements Cache {
         return namespaces.computeIfAbsent(name, n -> new Namespace(dir.resolve(n + ".json")));
     }
 
-    /** One namespace file and its in-memory copy. Guarded by its own monitor. */
+    /** One namespace file and its in-memory copy. Guarded by {@link #lock}. */
     private static final class Namespace {
         private final Path file;
+        final Object lock;
         private @Nullable Map<String, String> entries;
 
         Namespace(Path file) {
             this.file = file;
+            this.lock = FILE_LOCKS.computeIfAbsent(file.toAbsolutePath().normalize(), p -> new Object());
         }
 
         Map<String, String> entries() {
@@ -123,8 +128,22 @@ public final class FileCache implements Cache {
             return entries;
         }
 
-        void write() {
-            Map<String, String> snapshot = entries();
+        /**
+         * Sets {@code key} to {@code value} ({@code null} removes it) on top of the file's current
+         * content, which another instance or process may have changed since it was loaded.
+         */
+        void update(String key, @Nullable String value) {
+            Map<String, String> read = read(file);
+            // unreadable or corrupt: keep what we have in memory rather than drop it
+            Map<String, String> fresh = read != null ? read : new HashMap<>(entries());
+            boolean changed = value == null ? fresh.remove(key) != null : !value.equals(fresh.put(key, value));
+            entries = fresh;
+            if (changed) {
+                write(fresh);
+            }
+        }
+
+        private void write(Map<String, String> snapshot) {
             ObjectNode node = JSON.createObjectNode();
             snapshot.forEach(node::put);
             Path dir = file.getParent();
@@ -153,6 +172,12 @@ public final class FileCache implements Cache {
         }
 
         private static Map<String, String> load(Path file) {
+            Map<String, String> result = read(file);
+            return result != null ? result : new HashMap<>();
+        }
+
+        /** The file's entries: empty when it does not exist, {@code null} when unreadable or corrupt. */
+        private static @Nullable Map<String, String> read(Path file) {
             Map<String, String> result = new HashMap<>();
             String content;
             try {
@@ -160,14 +185,14 @@ public final class FileCache implements Cache {
             } catch (NoSuchFileException e) {
                 return result;
             } catch (IOException | RuntimeException e) {
-                LOG.warn("cannot read cache file {}, starting empty: {}", file, e.toString());
-                return result;
+                LOG.warn("cannot read cache file {}: {}", file, e.toString());
+                return null;
             }
             try {
                 JsonNode root = JSON.readTree(content);
                 if (root == null || !root.isObject()) {
-                    LOG.warn("corrupt cache file {} (not a JSON object), starting empty", file);
-                    return result;
+                    LOG.warn("corrupt cache file {} (not a JSON object), ignoring it", file);
+                    return null;
                 }
                 for (Map.Entry<String, JsonNode> e : root.properties()) {
                     if (e.getValue().isTextual()) {
@@ -175,7 +200,8 @@ public final class FileCache implements Cache {
                     }
                 }
             } catch (IOException e) {
-                LOG.warn("corrupt cache file {}, starting empty: {}", file, e.toString());
+                LOG.warn("corrupt cache file {}, ignoring it: {}", file, e.toString());
+                return null;
             }
             return result;
         }

@@ -40,6 +40,11 @@ final class ChartMapper {
 
     private ChartMapper() {}
 
+    /** Whether instruments of {@code instrumentType} (mutual funds, ETFs) report capital gains. */
+    static boolean hasCapitalGains(@Nullable String instrumentType) {
+        return instrumentType != null && CAPITAL_GAINS_TYPES.contains(instrumentType);
+    }
+
     /** Price repair hook, applied to the unadjusted bars before adjustment and dropping empty bars. */
     @FunctionalInterface
     interface Repairer {
@@ -90,7 +95,7 @@ final class ChartMapper {
         List<Split> splits = List.of();
         List<CapitalGain> capitalGains = List.of();
         String type = metadata.instrumentType();
-        boolean hasCapitalGains = type != null && CAPITAL_GAINS_TYPES.contains(type);
+        boolean hasCapitalGains = hasCapitalGains(type);
         if (request.actions() || repairer != null) {
             EventWindow window = new EventWindow(query, bars, zone);
             dividends = new ArrayList<>();

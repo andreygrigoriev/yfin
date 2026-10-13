@@ -62,12 +62,20 @@ public final class LiveStream implements AutoCloseable {
     /** Runs the heartbeat and reconnect attempts. */
     private final ScheduledExecutorService scheduler;
 
+    /**
+     * Serializes sends: the JDK WebSocket allows one outstanding send, and taking the snapshot under
+     * it keeps subscription frames in order. Acquired before {@link #lock}, never after it.
+     */
+    private final Object sendLock = new Object();
+
     private final Object lock = new Object();
     // guarded by lock
     private final SequencedSet<String> subscriptions = new LinkedHashSet<>();
     private @Nullable WebSocket socket;
     private int generation;
+    /** Consecutive connections that failed or ended before delivering a frame. */
     private int failedAttempts;
+
     private boolean reconnectScheduled;
     private boolean closed;
 
@@ -75,7 +83,7 @@ public final class LiveStream implements AutoCloseable {
         this.uri = b.uri;
         this.userAgent = b.userAgent;
         this.connectTimeout = b.connectTimeout;
-        this.reconnectPolicy = new ReconnectPolicy(b.reconnectInitialDelay, b.reconnectMaxDelay);
+        this.reconnectPolicy = b.reconnectPolicy;
         this.listener = Objects.requireNonNull(listener, "listener");
         var clientBuilder = HttpClient.newBuilder().connectTimeout(b.connectTimeout);
         if (b.proxy != null) {
@@ -89,7 +97,11 @@ public final class LiveStream implements AutoCloseable {
         try {
             WebSocket ws = open(0);
             synchronized (lock) {
-                socket = ws;
+                if (generation == 0) {
+                    socket = ws;
+                } else {
+                    ws.abort(); // lost before we got here: a reconnect is already scheduled
+                }
             }
         } catch (RuntimeException e) {
             shutdownExecutors();
@@ -113,10 +125,14 @@ public final class LiveStream implements AutoCloseable {
      */
     public void subscribe(Collection<String> symbols) {
         List<String> normalized = normalize(symbols);
-        synchronized (lock) {
-            ensureOpen();
-            subscriptions.addAll(normalized);
-            sendLocked(StreamerProtocol.subscribe(subscriptions));
+        synchronized (sendLock) {
+            Outgoing out;
+            synchronized (lock) {
+                ensureOpen();
+                subscriptions.addAll(normalized);
+                out = outgoingLocked(StreamerProtocol.subscribe(subscriptions));
+            }
+            send(out);
         }
     }
 
@@ -133,10 +149,14 @@ public final class LiveStream implements AutoCloseable {
      */
     public void unsubscribe(Collection<String> symbols) {
         List<String> normalized = normalize(symbols);
-        synchronized (lock) {
-            ensureOpen();
-            normalized.forEach(subscriptions::remove);
-            sendLocked(StreamerProtocol.unsubscribe(normalized));
+        synchronized (sendLock) {
+            Outgoing out;
+            synchronized (lock) {
+                ensureOpen();
+                normalized.forEach(subscriptions::remove);
+                out = outgoingLocked(StreamerProtocol.unsubscribe(normalized));
+            }
+            send(out);
         }
     }
 
@@ -217,27 +237,54 @@ public final class LiveStream implements AutoCloseable {
         }
     }
 
-    /** Sends {@code text} on the current socket; a failed send starts a reconnect. */
-    private void sendLocked(String text) {
+    /** A frame to send on the socket of one connection generation. */
+    private record Outgoing(WebSocket socket, int generation, String text) {}
+
+    /**
+     * Snapshot of what to send on the current socket, or null while reconnecting (the subscription
+     * set is sent once the new connection is up).
+     */
+    private @Nullable Outgoing outgoingLocked(String text) {
         WebSocket ws = socket;
-        if (ws == null) {
-            return; // reconnecting: the subscription set is sent once the new connection is up
+        return ws == null ? null : new Outgoing(ws, generation, text);
+    }
+
+    /**
+     * Sends {@code out} without holding {@link #lock}; the caller holds {@link #sendLock}. A failed
+     * send starts a reconnect.
+     */
+    private void send(@Nullable Outgoing out) {
+        if (out == null) {
+            return;
         }
         try {
-            ws.sendText(text, true).get(connectTimeout.toNanos(), TimeUnit.NANOSECONDS);
+            out.socket().sendText(out.text(), true).get(connectTimeout.toNanos(), TimeUnit.NANOSECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new YFTransportException("interrupted sending to " + uri, e);
         } catch (ExecutionException | TimeoutException e) {
             Throwable cause = e instanceof ExecutionException ? e.getCause() : e;
-            connectionLostLocked(generation, new YFTransportException("send to " + uri + " failed: " + cause, cause));
+            connectionLost(out.generation(), new YFTransportException("send to " + uri + " failed: " + cause, cause));
         }
     }
 
     private void heartbeat() {
+        synchronized (sendLock) {
+            Outgoing out = null;
+            synchronized (lock) {
+                if (!closed && !subscriptions.isEmpty()) {
+                    out = outgoingLocked(StreamerProtocol.subscribe(subscriptions));
+                }
+            }
+            send(out);
+        }
+    }
+
+    /** First frame of connection {@code gen} arrived: the connection works, so reset the backoff. */
+    private void connectionHealthy(int gen) {
         synchronized (lock) {
-            if (!closed && !subscriptions.isEmpty()) {
-                sendLocked(StreamerProtocol.subscribe(subscriptions));
+            if (gen == generation) {
+                failedAttempts = 0;
             }
         }
     }
@@ -255,6 +302,9 @@ public final class LiveStream implements AutoCloseable {
         WebSocket old = socket;
         socket = null;
         generation++;
+        // reset by connectionHealthy once a frame arrives, so a server that accepts and then drops
+        // the connection straight away still gets a growing backoff
+        failedAttempts++;
         if (old != null) {
             old.abort();
         }
@@ -268,7 +318,7 @@ public final class LiveStream implements AutoCloseable {
             return;
         }
         reconnectScheduled = true;
-        Duration delay = reconnectPolicy.delay(failedAttempts + 1);
+        Duration delay = reconnectPolicy.delay(Math.max(1, failedAttempts));
         try {
             scheduler.schedule(this::reconnect, delay.toNanos(), TimeUnit.NANOSECONDS);
         } catch (RejectedExecutionException e) {
@@ -294,51 +344,67 @@ public final class LiveStream implements AutoCloseable {
                     return;
                 }
                 failedAttempts++;
-                log.warn("reconnect attempt {} failed: {}", failedAttempts, e.getMessage());
+                log.warn("reconnect failed ({} consecutive failures): {}", failedAttempts, e.getMessage());
                 dispatchError(e);
                 scheduleReconnectLocked();
             }
             return;
         }
-        synchronized (lock) {
-            if (closed || gen != generation) {
-                ws.abort();
-                return;
+        synchronized (sendLock) {
+            Outgoing out = null;
+            synchronized (lock) {
+                if (closed || gen != generation) {
+                    ws.abort();
+                    return;
+                }
+                socket = ws;
+                log.info("reconnected to {}", uri);
+                if (!subscriptions.isEmpty()) {
+                    out = outgoingLocked(StreamerProtocol.subscribe(subscriptions));
+                }
             }
-            socket = ws;
-            failedAttempts = 0;
-            log.info("reconnected to {}", uri);
-            if (!subscriptions.isEmpty()) {
-                sendLocked(StreamerProtocol.subscribe(subscriptions));
-            }
+            send(out);
         }
     }
 
     // ---- callbacks ----
 
-    private void dispatchFrame(String frame) {
+    /**
+     * Hands {@code frame} to the callback thread, which requests the next frame from {@code
+     * webSocket} once the listener is done: a slow listener applies backpressure instead of
+     * queueing frames without bound.
+     */
+    private void dispatchFrame(WebSocket webSocket, String frame) {
         try {
             callbacks.execute(() -> {
-                PriceTick tick;
                 try {
-                    tick = StreamerProtocol.decodeFrame(frame);
-                } catch (YFDataException e) {
-                    log.debug("undecodable frame: {}", e.getMessage());
-                    notifyError(e);
-                    return;
-                }
-                if (tick == null) {
-                    return;
-                }
-                try {
-                    listener.onTick(tick);
-                } catch (RuntimeException e) {
-                    log.debug("onTick threw", e);
-                    notifyError(e);
+                    deliver(frame);
+                } finally {
+                    webSocket.request(1);
                 }
             });
         } catch (RejectedExecutionException e) {
             // closed
+        }
+    }
+
+    private void deliver(String frame) {
+        PriceTick tick;
+        try {
+            tick = StreamerProtocol.decodeFrame(frame);
+        } catch (YFDataException e) {
+            log.debug("undecodable frame: {}", e.getMessage());
+            notifyError(e);
+            return;
+        }
+        if (tick == null) {
+            return;
+        }
+        try {
+            listener.onTick(tick);
+        } catch (RuntimeException e) {
+            log.debug("onTick threw", e);
+            notifyError(e);
         }
     }
 
@@ -388,6 +454,7 @@ public final class LiveStream implements AutoCloseable {
 
         private final int gen;
         private final StringBuilder text = new StringBuilder();
+        private boolean healthy;
 
         Handler(int gen) {
             this.gen = gen;
@@ -401,12 +468,17 @@ public final class LiveStream implements AutoCloseable {
         @Override
         public @Nullable CompletionStage<?> onText(WebSocket webSocket, CharSequence data, boolean last) {
             text.append(data);
-            if (last) {
-                String frame = text.toString();
-                text.setLength(0);
-                dispatchFrame(frame);
+            if (!last) {
+                webSocket.request(1);
+                return null;
             }
-            webSocket.request(1);
+            String frame = text.toString();
+            text.setLength(0);
+            if (!healthy) {
+                healthy = true;
+                connectionHealthy(gen);
+            }
+            dispatchFrame(webSocket, frame); // requests the next frame once delivered
             return null;
         }
 
