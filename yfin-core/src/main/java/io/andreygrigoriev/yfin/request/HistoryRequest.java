@@ -110,7 +110,11 @@ public final class HistoryRequest {
         return actions;
     }
 
-    /** Price repair; empty means the client default. */
+    /**
+     * Price repair (yfinance's {@code repair=True}); empty means the client default. Repaired bars
+     * have {@link io.andreygrigoriev.yfin.model.Bar#repaired()} set. Multi-day intervals are then
+     * fetched as daily bars and resampled; {@link Interval#FIVE_DAYS} is not supported.
+     */
     public Optional<Boolean> repair() {
         return Optional.ofNullable(repair);
     }

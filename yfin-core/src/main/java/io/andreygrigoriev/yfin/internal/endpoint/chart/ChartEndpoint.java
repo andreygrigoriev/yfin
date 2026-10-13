@@ -5,6 +5,8 @@ import io.andreygrigoriev.yfin.exception.YFDataException;
 import io.andreygrigoriev.yfin.internal.endpoint.Uris;
 import io.andreygrigoriev.yfin.internal.http.YahooJson;
 import io.andreygrigoriev.yfin.internal.http.YahooSession;
+import io.andreygrigoriev.yfin.internal.repair.PriceRepair;
+import io.andreygrigoriev.yfin.internal.repair.RepairContext;
 import io.andreygrigoriev.yfin.model.HistoryMetadata;
 import io.andreygrigoriev.yfin.model.PriceHistory;
 import io.andreygrigoriev.yfin.request.HistoryRequest;
@@ -50,15 +52,26 @@ public final class ChartEndpoint {
     private final YahooSession session;
     private final Cache cache;
     private final Clock clock;
+    private final boolean defaultRepair;
 
     public ChartEndpoint(YahooSession session, Cache cache) {
-        this(session, cache, Clock.systemUTC());
+        this(session, cache, false);
+    }
+
+    /** @param defaultRepair whether requests that do not say so are price-repaired */
+    public ChartEndpoint(YahooSession session, Cache cache, boolean defaultRepair) {
+        this(session, cache, Clock.systemUTC(), defaultRepair);
     }
 
     ChartEndpoint(YahooSession session, Cache cache, Clock clock) {
+        this(session, cache, clock, false);
+    }
+
+    ChartEndpoint(YahooSession session, Cache cache, Clock clock, boolean defaultRepair) {
         this.session = Objects.requireNonNull(session, "session");
         this.cache = Objects.requireNonNull(cache, "cache");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.defaultRepair = defaultRepair;
     }
 
     /**
@@ -69,10 +82,120 @@ public final class ChartEndpoint {
      * @throws YFDataException when the response cannot be parsed
      */
     public PriceHistory history(String symbol, HistoryRequest request) {
+        if (request.repair().orElse(defaultRepair)) {
+            return repairedHistory(symbol, request, null);
+        }
         ChartQuery query = resolve(symbol, request);
         ChartDto dto = fetch(symbol, params(query));
         rememberTimezone(symbol, dto.meta());
         return ChartMapper.map(dto, query);
+    }
+
+    /**
+     * History with price repair. Multi-day intervals are fetched as daily bars, repaired and
+     * resampled, because Yahoo's multi-day adjustment is broken (as in yfinance).
+     *
+     * @param reconstructStart for nested reconstruction requests, the interval the outermost
+     *     reconstruction started from
+     */
+    private PriceHistory repairedHistory(String symbol, HistoryRequest request, @Nullable Interval reconstructStart) {
+        Interval target = request.interval();
+        if (target == Interval.FIVE_DAYS) {
+            throw new IllegalArgumentException("Yahoo's 5d interval is not supported with price repair");
+        }
+        boolean multiday =
+                target == Interval.ONE_WEEK || target == Interval.ONE_MONTH || target == Interval.THREE_MONTHS;
+        HistoryRequest effective = request;
+        boolean ytd = request.period().orElse(null) == Period.YTD;
+        if (multiday) {
+            effective = dailyRequest(symbol, request);
+        }
+        ChartQuery query = resolve(symbol, effective);
+        ChartDto dto = fetch(symbol, params(query));
+        rememberTimezone(symbol, dto.meta());
+        HistoryMetadata meta = ChartMapper.metadata(dto.meta(), symbol);
+        String currency = meta.currency() == null ? "" : meta.currency();
+        ZoneId zone = meta.exchangeZone();
+        RepairContext.FinerHistory finer = (sub, start, end, prepost, outer) -> {
+            HistoryRequest fine = HistoryRequest.builder()
+                    .start(start)
+                    .end(end)
+                    .interval(sub)
+                    .prepost(prepost)
+                    .autoAdjust(false)
+                    .actions(true)
+                    .repair(true)
+                    .build();
+            PriceHistory h = repairedHistory(symbol, fine, outer);
+            String type = h.metadata().instrumentType();
+            boolean funds = "MUTUALFUND".equals(type) || "ETF".equals(type);
+            return PriceRepair.frameOf(h.bars(), h.dividends(), h.splits(), h.capitalGains(), funds, sub);
+        };
+        RepairContext ctx =
+                new RepairContext(symbol, zone, currency, meta.regularMarketPrice(), clock, finer, reconstructStart);
+        PriceHistory h = ChartMapper.map(
+                dto,
+                query,
+                (bars, dividends, splits, capitalGains, funds, metadata) -> PriceRepair.repair(
+                        bars,
+                        dividends,
+                        splits,
+                        capitalGains,
+                        funds,
+                        query.interval(),
+                        query.request().prepost(),
+                        ctx));
+        if (!multiday) {
+            return h;
+        }
+        return new PriceHistory(
+                h.symbol(),
+                h.exchangeZone(),
+                target,
+                h.currency(),
+                PriceRepair.resample(h.bars(), target, ytd, ctx),
+                h.dividends(),
+                h.splits(),
+                h.capitalGains(),
+                h.metadata());
+    }
+
+    /** The daily request behind a repaired multi-day request; a period becomes a start date as in yfinance. */
+    private HistoryRequest dailyRequest(String symbol, HistoryRequest request) {
+        HistoryRequest.Builder b = HistoryRequest.builder()
+                .interval(Interval.ONE_DAY)
+                .prepost(request.prepost())
+                .autoAdjust(request.autoAdjust())
+                .backAdjust(request.backAdjust())
+                .actions(request.actions())
+                .repair(true)
+                .keepNa(request.keepNa());
+        Period period = request.period().orElse(null);
+        Temporal start = request.start().orElse(null);
+        Temporal end = request.end().orElse(null);
+        if (start == null && end == null && period != null && period != Period.MAX) {
+            LocalDate today = clock.instant().atZone(timezone(symbol)).toLocalDate();
+            if (period == Period.YTD) {
+                b.start(today.withDayOfYear(1));
+            } else {
+                b.start(today.minus(period.length().orElseThrow()).minusDays(4));
+            }
+            return b.build();
+        }
+        if (period != null) {
+            b.period(period);
+        }
+        if (start instanceof LocalDate d) {
+            b.start(d);
+        } else if (start instanceof Instant i) {
+            b.start(i);
+        }
+        if (end instanceof LocalDate d) {
+            b.end(d);
+        } else if (end instanceof Instant i) {
+            b.end(i);
+        }
+        return b.build();
     }
 
     /** Chart metadata from a short daily request (5 days). */

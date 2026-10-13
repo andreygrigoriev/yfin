@@ -550,7 +550,10 @@ public final class YFinance implements AutoCloseable {
             return this;
         }
 
-        /** Whether price history requests repair bad prices by default; default {@code false}. */
+        /**
+         * Whether price history requests repair bad prices by default (see {@link
+         * HistoryRequest#repair()}); default {@code false}.
+         */
         public Builder repair(boolean repair) {
             this.repair = repair;
             return this;

@@ -438,7 +438,7 @@ public final class Ticker {
     }
 
     private ChartEndpoint chart() {
-        return new ChartEndpoint(client.session(), client.cache());
+        return new ChartEndpoint(client.session(), client.cache(), client.repair());
     }
 
     @Override

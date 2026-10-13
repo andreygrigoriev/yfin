@@ -3,6 +3,7 @@ package io.andreygrigoriev.yfin.internal.endpoint.chart;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.andreygrigoriev.yfin.exception.YFDataException;
 import io.andreygrigoriev.yfin.internal.http.YahooJson;
+import io.andreygrigoriev.yfin.internal.repair.PriceRepair;
 import io.andreygrigoriev.yfin.model.Bar;
 import io.andreygrigoriev.yfin.model.CapitalGain;
 import io.andreygrigoriev.yfin.model.Dividend;
@@ -39,7 +40,23 @@ final class ChartMapper {
 
     private ChartMapper() {}
 
+    /** Price repair hook, applied to the unadjusted bars before adjustment and dropping empty bars. */
+    @FunctionalInterface
+    interface Repairer {
+        PriceRepair.Result repair(
+                List<Bar> bars,
+                List<Dividend> dividends,
+                List<Split> splits,
+                List<CapitalGain> capitalGains,
+                boolean hasCapitalGains,
+                HistoryMetadata metadata);
+    }
+
     static PriceHistory map(ChartDto dto, ChartQuery query) {
+        return map(dto, query, null);
+    }
+
+    static PriceHistory map(ChartDto dto, ChartQuery query, @Nullable Repairer repairer) {
         HistoryRequest request = query.request();
         Interval interval = query.interval();
         HistoryMetadata metadata = metadata(dto.meta(), query.symbol());
@@ -72,7 +89,9 @@ final class ChartMapper {
         List<Dividend> dividends = List.of();
         List<Split> splits = List.of();
         List<CapitalGain> capitalGains = List.of();
-        if (request.actions()) {
+        String type = metadata.instrumentType();
+        boolean hasCapitalGains = type != null && CAPITAL_GAINS_TYPES.contains(type);
+        if (request.actions() || repairer != null) {
             EventWindow window = new EventWindow(query, bars, zone);
             dividends = new ArrayList<>();
             for (ChartDto.Amount d : dto.dividends()) {
@@ -86,8 +105,7 @@ final class ChartMapper {
                     splits.add(new Split(eventTime(s.epoch(), interval, zone), s.numerator(), s.denominator()));
                 }
             }
-            String type = metadata.instrumentType();
-            if (type != null && CAPITAL_GAINS_TYPES.contains(type)) {
+            if (hasCapitalGains) {
                 capitalGains = new ArrayList<>();
                 for (ChartDto.Amount g : dto.capitalGains()) {
                     if (window.contains(g.epoch())) {
@@ -99,6 +117,19 @@ final class ChartMapper {
 
         bars = mergeLiveBar(bars, interval, request.prepost() && interval.isIntraday());
         bars = dropDuplicateTimes(bars);
+        String currency = metadata.currency() == null ? "" : metadata.currency();
+        if (repairer != null) {
+            PriceRepair.Result repaired =
+                    repairer.repair(bars, dividends, splits, capitalGains, hasCapitalGains, metadata);
+            bars = new ArrayList<>(repaired.bars());
+            dividends = repaired.dividends();
+            currency = repaired.currency();
+            if (!request.actions()) {
+                dividends = List.of();
+                splits = List.of();
+                capitalGains = List.of();
+            }
+        }
         if (request.autoAdjust()) {
             bars = adjust(bars, true);
         } else if (request.backAdjust()) {
@@ -108,7 +139,6 @@ final class ChartMapper {
             bars.removeIf(ChartMapper::isNaOrZero);
         }
 
-        String currency = metadata.currency() == null ? "" : metadata.currency();
         return new PriceHistory(
                 query.symbol(), zone, interval, currency, bars, dividends, splits, capitalGains, metadata);
     }
@@ -383,7 +413,8 @@ final class ChartMapper {
                     b.low() * ratio,
                     auto ? b.adjClose() : b.close(),
                     b.adjClose(),
-                    b.volume()));
+                    b.volume(),
+                    b.repaired()));
         }
         return result;
     }

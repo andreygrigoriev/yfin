@@ -12,12 +12,26 @@ import java.util.Objects;
  * is Yahoo's adjusted close.
  *
  * @param time bar start in the exchange's timezone; midnight for daily and longer bars
+ * @param repaired whether price repair changed any value of this bar (yfinance's {@code Repaired?}
+ *     column); always {@code false} when repair is off
  */
 public record Bar(
-        ZonedDateTime time, double open, double high, double low, double close, double adjClose, long volume) {
+        ZonedDateTime time,
+        double open,
+        double high,
+        double low,
+        double close,
+        double adjClose,
+        long volume,
+        boolean repaired) {
 
     public Bar {
         Objects.requireNonNull(time, "time");
+    }
+
+    /** A bar not touched by price repair. */
+    public Bar(ZonedDateTime time, double open, double high, double low, double close, double adjClose, long volume) {
+        this(time, open, high, low, close, adjClose, volume, false);
     }
 
     /** Whether every price is missing. */

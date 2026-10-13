@@ -511,13 +511,19 @@ YFinanceException (RuntimeException)
 - Modify: `internal/endpoint/chart/ChartMapper.java` / `Ticker.java` (apply when `repair=true`)
 - Create: `yfin-core/src/test/resources/repair/*.csv` (ported from yfinance tests/data)
 - Create: `yfin-core/src/test/java/io/andreygrigoriev/yfin/internal/repair/*Test.java`
+- ➕ Created in `internal/repair`: `Frame` (mutable column table, the DataFrame counterpart), `Stats` (numpy/scipy/sklearn helpers incl. 1-D DBSCAN), `Intervals`, `RepairContext` (symbol state + `FinerHistory` fetcher), `SuddenChange` (`_fix_prices_sudden_change`), `UnitMixups` (switch + random), `Zeroes`, `Reconstruct` (`_reconstruct_intervals_batch`), `SplitRepair`, `DividendRepair` (`_fix_bad_div_adjust`), `CapitalGainsRepair`, `Resample` (`_resample`), `PriceRepair` (pipeline, `_standardise_currency`, bars/actions <-> table)
+- ➕ Modify: `model/Bar.java` (`repaired` component + 7-arg constructor), `internal/endpoint/chart/ChartEndpoint.java` (repaired path, multi-day via daily + resample, nested finer fetches), `request/HistoryRequest.java`, `YFinance.java` (javadoc)
+- ➕ Tests: `YFinanceRepairCasesTest` (yfinance's CSV cases), `PriceRepairTest` (reconstruction cases with a recorded daily series as finer data, pipeline invariants), `TickerRepairTest`, `RepairCsv` (CSV loader)
+- ⚠️ Decision: repaired bars are flagged with `Bar.repaired()` (yfinance's `Repaired?` column); `PriceHistory.currency()` is the currency after repair (e.g. `GBP` when Yahoo's GBp bars were already in pounds)
+- ⚠️ Not ported: `_dividends_convert_fx` (dividends in another currency than prices; our chart DTO does not carry a dividend currency, and it needs extra FX requests). Events outside the bars (yfinance adds NaN rows for them) are passed through unrepaired
+- ⚠️ yfinance tests that need live data (`test_repair_100x_random_*`, `test_repair_zeroes_*`, good-ticker split checks, GBP not converted) are replaced by synthetic cases in `PriceRepairTest` (errors injected into a recorded CALM daily/weekly series, finer data served from the same recording); all CSV-based cases (unit switch AET.L/SSW.JO/ASAI.L, bad splits incl. NRDY tail, 19 bad-div tickers, 7 div false positives, 3 capital-gains double counts) pass at yfinance's tolerances
 
-- [ ] port yfinance repair pipeline in its order: 100× unit mix-ups, zero/missing price fill (incl. reconstruct from finer interval), bad stock splits, bad dividends (and dividend-adjust consistency), capital-gains double counting
-- [ ] repaired bars flagged (`Bar.repaired()` boolean or separate `PriceHistory.repairedIndices()`, decide once and document)
-- [ ] reconstruction requests finer-interval history via the same session (respects limiter)
-- [ ] port yfinance repair tests with their CSV inputs/expected outputs
-- [ ] write tests: repair disabled leaves data untouched; already-clean data unchanged
-- [ ] run `rtk ./mvnw verify` - must pass before next task
+- [x] port yfinance repair pipeline in its order: 100× unit mix-ups, zero/missing price fill (incl. reconstruct from finer interval), bad stock splits, bad dividends (and dividend-adjust consistency), capital-gains double counting
+- [x] repaired bars flagged (`Bar.repaired()` boolean or separate `PriceHistory.repairedIndices()`, decide once and document)
+- [x] reconstruction requests finer-interval history via the same session (respects limiter)
+- [x] port yfinance repair tests with their CSV inputs/expected outputs
+- [x] write tests: repair disabled leaves data untouched; already-clean data unchanged
+- [x] run `rtk ./mvnw verify` - must pass before next task
 
 ### Task 22: Live streaming (yfin-live)
 
