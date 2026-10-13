@@ -570,10 +570,12 @@ YFinanceException (RuntimeException)
 - Create: `yfin-dflib/src/main/java/module-info.java`
 - Create: `yfin-dflib/src/main/java/io/andreygrigoriev/yfin/dflib/DFLibAdapter.java`
 - Create: `yfin-dflib/src/test/java/io/andreygrigoriev/yfin/dflib/DFLibAdapterTest.java`
+- ➕ Modify: `yfin-dflib/pom.xml` (optional jspecify, like the Tablesaw adapter)
+- ⚠️ Decision: DFLib columns hold any object, so timestamps stay `ZonedDateTime` in the exchange zone (unlike Tablesaw's local date-times); prices are `DoubleSeries` (NaN kept), non-null integers `LongSeries`, booleans `BooleanSeries`; nullable values (holder shares/value/date, strings, option lastTradeDate) are object series with `null`. DataFrames have no name. Methods: `toDataFrame(PriceHistory)`, `toDataFrame(FinancialStatement)`, `holdersToDataFrame`, `optionsToDataFrame`, `earningsDatesToDataFrame`; event-to-bar placement duplicated from the Tablesaw adapter. DFLib 1.3.0 has no module descriptor: required as automatic module `dflib`
 
-- [ ] same conversions as Task 23 targeting DFLib `DataFrame`
-- [ ] write tests mirroring Task 23 cases
-- [ ] run `rtk ./mvnw verify` - must pass before next task
+- [x] same conversions as Task 23 targeting DFLib `DataFrame`
+- [x] write tests mirroring Task 23 cases
+- [x] run `rtk ./mvnw verify` - must pass before next task
 
 ### Task 25: Live integration suite and FixtureRecorder (yfin-it)
 
