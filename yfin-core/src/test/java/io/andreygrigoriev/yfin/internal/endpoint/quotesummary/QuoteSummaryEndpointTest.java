@@ -182,7 +182,7 @@ class QuoteSummaryEndpointTest {
 
     @Test
     void moduleNames() {
-        assertThat(QuoteSummaryModule.values()).hasSize(33);
+        assertThat(QuoteSummaryModule.values()).hasSize(34);
         assertThat(QuoteSummaryModule.fromYahooName("defaultKeyStatistics")).contains(DEFAULT_KEY_STATISTICS);
         assertThat(QuoteSummaryModule.fromYahooName("nope")).isEmpty();
     }

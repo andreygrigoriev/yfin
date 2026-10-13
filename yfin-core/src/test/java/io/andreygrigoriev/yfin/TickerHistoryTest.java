@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.andreygrigoriev.yfin.exception.YFDataException;
+import io.andreygrigoriev.yfin.exception.YFRateLimitException;
 import io.andreygrigoriev.yfin.exception.YFSymbolNotFoundException;
 import io.andreygrigoriev.yfin.internal.cache.FileCache;
 import io.andreygrigoriev.yfin.model.Actions;
@@ -245,6 +246,15 @@ class TickerHistoryTest {
         assertThat(m.exchangeZone()).isEqualTo(ZoneId.of("UTC"));
         assertThat(m.instrumentType()).isEqualTo("CRYPTOCURRENCY");
         assertThat(query(chartRequests().getFirst())).containsEntry("interval", List.of("1d"));
+    }
+
+    @Test
+    void rateLimitedThroughTicker() {
+        fake.onGet(CHART + "AAPL").respond(429, "Too Many Requests");
+
+        // end to end: Ticker -> session -> retry policy (no retries configured) -> typed exception
+        assertThatThrownBy(() -> yf.ticker("AAPL").history(Period.ONE_MONTH)).isInstanceOf(YFRateLimitException.class);
+        assertThat(chartRequests()).hasSize(1);
     }
 
     @Test

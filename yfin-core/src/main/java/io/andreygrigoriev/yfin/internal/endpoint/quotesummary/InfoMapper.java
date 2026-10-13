@@ -36,6 +36,18 @@ public final class InfoMapper {
      * @param quote the quote object for the symbol, or {@code null} when Yahoo returned none
      */
     public static TickerInfo map(String symbol, Map<QuoteSummaryModule, JsonNode> modules, @Nullable JsonNode quote) {
+        return map(symbol, modules, quote, null);
+    }
+
+    /**
+     * {@link #map(String, Map, JsonNode)} plus yfinance's complementary {@code trailingPegRatio},
+     * added last; absent when {@code trailingPegRatio} is {@code null}.
+     */
+    public static TickerInfo map(
+            String symbol,
+            Map<QuoteSummaryModule, JsonNode> modules,
+            @Nullable JsonNode quote,
+            @Nullable Double trailingPegRatio) {
         var merged = new LinkedHashMap<String, JsonNode>();
         if (!modules.isEmpty()) {
             modules.forEach((m, node) -> merged.put(m.yahooName(), node));
@@ -68,6 +80,9 @@ public final class InfoMapper {
                 raw.put(key, plain);
             }
         });
+        if (trailingPegRatio != null) {
+            raw.put("trailingPegRatio", trailingPegRatio);
+        }
         return new TickerInfo(symbol, raw);
     }
 

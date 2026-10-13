@@ -6,6 +6,7 @@ import io.andreygrigoriev.yfin.internal.endpoint.Uris;
 import io.andreygrigoriev.yfin.internal.http.YahooJson;
 import io.andreygrigoriev.yfin.internal.http.YahooSession;
 import io.andreygrigoriev.yfin.model.FinancialStatement;
+import io.andreygrigoriev.yfin.model.ValuationMeasures;
 import io.andreygrigoriev.yfin.request.Frequency;
 import io.andreygrigoriev.yfin.spi.HttpRequest;
 import java.net.URI;
@@ -16,8 +17,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,6 +41,12 @@ public final class TimeseriesEndpoint {
      * five quarters regardless.
      */
     static final long PERIOD1 = 1_483_142_400L;
+
+    /** The info complement yfinance fetches from this endpoint. */
+    static final String TRAILING_PEG_RATIO = "trailingPegRatio";
+
+    /** Look-back of the {@code trailingPegRatio} request: half a year, as in yfinance. */
+    static final long PEG_LOOKBACK_DAYS = 365 / 2;
 
     private final YahooSession session;
     private final Supplier<Instant> clock;
@@ -72,12 +79,67 @@ public final class TimeseriesEndpoint {
         return TimeseriesMapper.map(symbol, frequency, statement.keys(), results);
     }
 
+    /**
+     * Valuation measures of {@code symbol} (yfinance {@code get_valuation_measures}): the {@code
+     * frequency} series of every {@link ValuationMapper#MEASURES measure} plus the trailing series
+     * behind {@link ValuationMeasures#current()}, in one request.
+     *
+     * @throws YFDataException for an error envelope or an unexpected payload
+     */
+    public ValuationMeasures valuationMeasures(String symbol, Frequency frequency) {
+        Objects.requireNonNull(symbol, "symbol");
+        Objects.requireNonNull(frequency, "frequency");
+        var types = new ArrayList<String>();
+        for (String key : ValuationMapper.MEASURES) {
+            types.add(frequency.yahooPrefix() + key);
+            if (frequency != Frequency.TRAILING) {
+                types.add(Frequency.TRAILING.yahooPrefix() + key);
+            }
+        }
+        List<JsonNode> results = fetchTypes(symbol, types, PERIOD1);
+        return ValuationMapper.map(symbol, frequency, results);
+    }
+
+    /**
+     * The latest {@code trailingPegRatio} reported over the last half year, which yfinance adds to
+     * {@code info}; empty when Yahoo has none (ETFs, indices, crypto, unprofitable companies).
+     *
+     * @throws YFDataException for an error envelope or an unexpected payload
+     */
+    public Optional<Double> trailingPegRatio(String symbol) {
+        Objects.requireNonNull(symbol, "symbol");
+        long period1 = clock.get()
+                .truncatedTo(ChronoUnit.DAYS)
+                .minus(PEG_LOOKBACK_DAYS, ChronoUnit.DAYS)
+                .getEpochSecond();
+        List<JsonNode> results = fetchTypes(symbol, List.of(TRAILING_PEG_RATIO), period1);
+        return latestValue(results, TRAILING_PEG_RATIO);
+    }
+
+    /** The {@code raw} value of the last point of series {@code type}; empty when absent. */
+    static Optional<Double> latestValue(List<JsonNode> results, String type) {
+        for (JsonNode result : results) {
+            JsonNode points = result.path(type);
+            if (points.isArray() && !points.isEmpty()) {
+                JsonNode raw =
+                        points.get(points.size() - 1).path("reportedValue").path("raw");
+                return raw.isNumber() ? Optional.of(raw.doubleValue()) : Optional.empty();
+            }
+        }
+        return Optional.empty();
+    }
+
     /** The {@code result} elements of all chunk responses, in order. */
     List<JsonNode> fetch(String symbol, String prefix, List<String> keys) {
+        return fetchTypes(symbol, keys.stream().map(k -> prefix + k).toList(), PERIOD1);
+    }
+
+    /** {@link #fetch} for fully named types (prefix included) from {@code period1}. */
+    private List<JsonNode> fetchTypes(String symbol, List<String> types, long period1) {
         var results = new ArrayList<JsonNode>();
-        for (int i = 0; i < keys.size(); i += CHUNK_KEYS) {
-            List<String> chunk = keys.subList(i, Math.min(i + CHUNK_KEYS, keys.size()));
-            URI uri = Uris.uri(BASE_URL + Uris.encode(symbol), params(symbol, prefix, chunk));
+        for (int i = 0; i < types.size(); i += CHUNK_KEYS) {
+            List<String> chunk = types.subList(i, Math.min(i + CHUNK_KEYS, types.size()));
+            URI uri = Uris.uri(BASE_URL + Uris.encode(symbol), typeParams(symbol, chunk, period1));
             LOG.debug("{}: GET {}", symbol, uri);
             JsonNode root = YahooJson.read(session.execute(HttpRequest.get(uri)), symbol);
             results.addAll(parse(root));
@@ -86,10 +148,14 @@ public final class TimeseriesEndpoint {
     }
 
     Map<String, String> params(String symbol, String prefix, List<String> keys) {
+        return typeParams(symbol, keys.stream().map(k -> prefix + k).toList(), PERIOD1);
+    }
+
+    private Map<String, String> typeParams(String symbol, List<String> types, long period1) {
         var params = new LinkedHashMap<String, String>();
         params.put("symbol", symbol);
-        params.put("type", keys.stream().map(k -> prefix + k).collect(Collectors.joining(",")));
-        params.put("period1", Long.toString(PERIOD1));
+        params.put("type", String.join(",", types));
+        params.put("period1", Long.toString(period1));
         params.put("period2", Long.toString(period2(clock.get())));
         return params;
     }

@@ -26,6 +26,7 @@ class TickerInfoTest {
 
     private static final String QUOTE_SUMMARY = "/v10/finance/quoteSummary/";
     private static final String QUOTE = "/v7/finance/quote";
+    private static final String TIMESERIES = "/ws/fundamentals-timeseries/v1/finance/timeseries/";
 
     private final FakeTransport fake = FakeTransport.create();
     private YFinance yf;
@@ -49,7 +50,15 @@ class TickerInfoTest {
     private TickerInfo info(String symbol, String fixture) {
         fake.onGet(QUOTE_SUMMARY + symbol).respondFixture("quoteSummary/" + fixture);
         fake.onGet(QUOTE).query("symbols", symbol).respondFixture("quote/" + fixture);
+        servePeg(symbol);
         return yf.ticker(symbol).info();
+    }
+
+    /** Recorded trailingPegRatio responses: AAPL has values, SPY (like any non-equity) none. */
+    private void servePeg(String symbol) {
+        fake.onGet(TIMESERIES + symbol)
+                .query("type", "trailingPegRatio")
+                .respondFixture("timeseries/peg/" + (symbol.equals("AAPL") ? "aapl.json" : "spy.json"));
     }
 
     @Test
@@ -89,8 +98,8 @@ class TickerInfoTest {
     void equityRawMatchesYfinanceFlattening() {
         TickerInfo info = info("AAPL", "aapl.json");
 
-        // same key count yfinance 1.7.0 produces for these two responses (trailingPegRatio aside)
-        assertThat(info.raw()).hasSize(182);
+        // same key count yfinance 1.7.0 produces for these responses
+        assertThat(info.raw()).hasSize(183);
         // maxAge 1 (days) becomes seconds
         assertThat(info.raw()).containsEntry("maxAge", 86_400L).containsEntry("priceHint", 2L);
         // nested values stay nested, with {raw, fmt} unwrapped
@@ -164,6 +173,7 @@ class TickerInfoTest {
     void quoteMissingStillGivesQuoteSummaryFields() {
         fake.onGet(QUOTE_SUMMARY + "AAPL").respondFixture("quoteSummary/aapl.json");
         fake.onGet(QUOTE).query("symbols", "AAPL").respondFixture("quote/not-found.json");
+        servePeg("AAPL");
 
         TickerInfo info = yf.ticker("AAPL").info();
 
@@ -171,6 +181,33 @@ class TickerInfoTest {
         assertThat(info.marketCap()).isEqualTo(4_968_997_191_680L); // summaryDetail's
         assertThat(info.dividendYield()).isEqualTo(0.0032);
         assertThat(info.marketState()).isNull(); // only in the quote
+    }
+
+    @Test
+    void trailingPegRatioFromTimeseries() {
+        TickerInfo info = info("AAPL", "aapl.json");
+
+        // the last point of the half-year series, added after every other key, as in yfinance
+        assertThat(info.trailingPegRatio()).isEqualTo(2.706);
+        assertThat(List.copyOf(info.raw().keySet()).getLast()).isEqualTo("trailingPegRatio");
+        var request = fake.requests().stream()
+                .filter(r -> r.uri().getPath().equals(TIMESERIES + "AAPL"))
+                .findFirst()
+                .orElseThrow();
+        Map<String, List<String>> q = FakeTransport.parseQuery(request.uri().getRawQuery());
+        assertThat(q.get("symbol")).containsExactly("AAPL");
+        long period1 = Long.parseLong(q.get("period1").getFirst());
+        long period2 = Long.parseLong(q.get("period2").getFirst());
+        assertThat(period1 % 86_400).isZero();
+        assertThat(period2 - period1).isEqualTo((182 + 1) * 86_400L);
+    }
+
+    @Test
+    void noTrailingPegRatioIsAbsent() {
+        TickerInfo info = info("SPY", "spy.json");
+
+        assertThat(info.trailingPegRatio()).isNull();
+        assertThat(info.raw()).doesNotContainKey("trailingPegRatio");
     }
 
     @Test

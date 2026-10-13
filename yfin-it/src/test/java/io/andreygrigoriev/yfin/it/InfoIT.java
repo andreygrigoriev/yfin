@@ -4,8 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import io.andreygrigoriev.yfin.YFinance;
 import io.andreygrigoriev.yfin.model.FastInfo;
+import io.andreygrigoriev.yfin.model.FundsData;
+import io.andreygrigoriev.yfin.model.SecFiling;
 import io.andreygrigoriev.yfin.model.TickerInfo;
 import java.time.ZoneId;
+import java.util.List;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -36,6 +39,25 @@ class InfoIT {
         assertThat(info.regularMarketPrice()).isPositive();
         assertThat(info.fiftyTwoWeekHigh()).isGreaterThanOrEqualTo(info.fiftyTwoWeekLow());
         assertThat(info.raw()).hasSizeGreaterThan(50);
+        assertThat(info.trailingPegRatio()).isPositive();
+    }
+
+    @Test
+    void fundsData() {
+        FundsData spy = yf.ticker("SPY").fundsData().orElseThrow();
+
+        assertThat(spy.quoteType()).isEqualTo("ETF");
+        assertThat(spy.topHoldings()).isNotEmpty();
+        assertThat(spy.sectorWeightings()).isNotEmpty();
+        assertThat(yf.ticker("AAPL").fundsData()).isEmpty();
+    }
+
+    @Test
+    void secFilings() {
+        List<SecFiling> filings = yf.ticker("AAPL").secFilings();
+
+        assertThat(filings).isNotEmpty().allSatisfy(f -> assertThat(f.date()).isNotNull());
+        assertThat(filings).anySatisfy(f -> assertThat(f.type()).isEqualTo("10-K"));
     }
 
     @Test

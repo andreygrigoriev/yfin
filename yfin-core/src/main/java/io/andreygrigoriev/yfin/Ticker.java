@@ -9,10 +9,12 @@ import io.andreygrigoriev.yfin.internal.endpoint.options.OptionsEndpoint;
 import io.andreygrigoriev.yfin.internal.endpoint.quote.QuoteEndpoint;
 import io.andreygrigoriev.yfin.internal.endpoint.quotesummary.AnalystMapper;
 import io.andreygrigoriev.yfin.internal.endpoint.quotesummary.CalendarMapper;
+import io.andreygrigoriev.yfin.internal.endpoint.quotesummary.FundsMapper;
 import io.andreygrigoriev.yfin.internal.endpoint.quotesummary.HoldersMapper;
 import io.andreygrigoriev.yfin.internal.endpoint.quotesummary.InfoMapper;
 import io.andreygrigoriev.yfin.internal.endpoint.quotesummary.QuoteSummaryEndpoint;
 import io.andreygrigoriev.yfin.internal.endpoint.quotesummary.QuoteSummaryModule;
+import io.andreygrigoriev.yfin.internal.endpoint.quotesummary.SecFilingsMapper;
 import io.andreygrigoriev.yfin.internal.endpoint.quotesummary.SustainabilityMapper;
 import io.andreygrigoriev.yfin.internal.endpoint.shares.SharesEndpoint;
 import io.andreygrigoriev.yfin.internal.endpoint.timeseries.StatementKeys;
@@ -29,6 +31,7 @@ import io.andreygrigoriev.yfin.model.EpsRevisions;
 import io.andreygrigoriev.yfin.model.EpsTrend;
 import io.andreygrigoriev.yfin.model.FastInfo;
 import io.andreygrigoriev.yfin.model.FinancialStatement;
+import io.andreygrigoriev.yfin.model.FundsData;
 import io.andreygrigoriev.yfin.model.GrowthEstimate;
 import io.andreygrigoriev.yfin.model.HistoryMetadata;
 import io.andreygrigoriev.yfin.model.Holder;
@@ -42,11 +45,13 @@ import io.andreygrigoriev.yfin.model.PriceHistory;
 import io.andreygrigoriev.yfin.model.PriceTargets;
 import io.andreygrigoriev.yfin.model.Recommendation;
 import io.andreygrigoriev.yfin.model.RevenueEstimate;
+import io.andreygrigoriev.yfin.model.SecFiling;
 import io.andreygrigoriev.yfin.model.SharesCount;
 import io.andreygrigoriev.yfin.model.Split;
 import io.andreygrigoriev.yfin.model.Sustainability;
 import io.andreygrigoriev.yfin.model.TickerInfo;
 import io.andreygrigoriev.yfin.model.UpgradeDowngrade;
+import io.andreygrigoriev.yfin.model.ValuationMeasures;
 import io.andreygrigoriev.yfin.request.Frequency;
 import io.andreygrigoriev.yfin.request.HistoryRequest;
 import io.andreygrigoriev.yfin.request.Interval;
@@ -146,14 +151,16 @@ public final class Ticker {
 
     /**
      * Everything Yahoo reports about the symbol (profile, valuation, key statistics, latest quote),
-     * flattened like yfinance's {@code info}. Two requests: {@code quoteSummary} and {@code
-     * /v7/finance/quote}. Fields Yahoo has no data for are absent, never an error.
+     * flattened like yfinance's {@code info}. Three requests: {@code quoteSummary}, {@code
+     * /v7/finance/quote} and the fundamentals timeseries for the complementary {@code
+     * trailingPegRatio}. Fields Yahoo has no data for are absent, never an error.
      */
     public TickerInfo info() {
         Map<QuoteSummaryModule, JsonNode> modules =
                 new QuoteSummaryEndpoint(client.session()).fetch(symbol, InfoMapper.INFO_MODULES);
         JsonNode quote = new QuoteEndpoint(client.session()).quote(symbol).orElse(null);
-        return InfoMapper.map(symbol, modules, quote);
+        Double peg = timeseries().trailingPegRatio(symbol).orElse(null);
+        return InfoMapper.map(symbol, modules, quote, peg);
     }
 
     /**
@@ -366,6 +373,40 @@ public final class Ticker {
         return statement(StatementKeys.CASH_FLOW, frequency);
     }
 
+    /**
+     * Valuation measures (market cap, enterprise value, P/E, PEG, P/S, P/B, EV/revenue,
+     * EV/EBITDA) per {@code frequency} period plus the latest trailing value of each (yfinance
+     * {@code get_valuation_measures}); one request. Unlike yfinance, every period Yahoo returns is
+     * kept (yfinance caps at five by default). Empty when Yahoo has none, e.g. for an ETF.
+     */
+    public ValuationMeasures valuationMeasures(Frequency frequency) {
+        Objects.requireNonNull(frequency, "frequency");
+        return timeseries().valuationMeasures(symbol, frequency);
+    }
+
+    /** {@link #valuationMeasures(Frequency)} by quarter, like yfinance's {@code valuation}. */
+    public ValuationMeasures valuationMeasures() {
+        return valuationMeasures(Frequency.QUARTERLY);
+    }
+
+    /**
+     * SEC filings, newest first (yfinance {@code sec_filings}); empty when Yahoo has none, e.g.
+     * for an ETF or a non-US listing.
+     */
+    public List<SecFiling> secFilings() {
+        return SecFilingsMapper.filings(module(QuoteSummaryModule.SEC_FILINGS));
+    }
+
+    /**
+     * Profile, holdings and portfolio breakdown of an ETF or mutual fund (yfinance {@code
+     * funds_data}); one request. Empty when the symbol is not a fund (yfinance raises "No Fund
+     * data found").
+     */
+    public Optional<FundsData> fundsData() {
+        return FundsMapper.fundsData(
+                symbol, new QuoteSummaryEndpoint(client.session()).fetch(symbol, FundsMapper.FUND_MODULES));
+    }
+
     /** {@link #news(int, NewsTab)} with yfinance's defaults: 10 articles of {@link NewsTab#NEWS}. */
     public List<NewsItem> news() {
         return news(10, NewsTab.NEWS);
@@ -434,7 +475,11 @@ public final class Ticker {
 
     private FinancialStatement statement(StatementKeys statement, Frequency frequency) {
         Objects.requireNonNull(frequency, "frequency");
-        return new TimeseriesEndpoint(client.session()).statement(symbol, statement, frequency);
+        return timeseries().statement(symbol, statement, frequency);
+    }
+
+    private TimeseriesEndpoint timeseries() {
+        return new TimeseriesEndpoint(client.session());
     }
 
     private ChartEndpoint chart() {

@@ -8,6 +8,7 @@ public enum QuoteSummaryModule {
     SUMMARY_DETAIL("summaryDetail"),
     ASSET_PROFILE("assetProfile"),
     FUND_PROFILE("fundProfile"),
+    TOP_HOLDINGS("topHoldings"),
     PRICE("price"),
     QUOTE_TYPE("quoteType"),
     ESG_SCORES("esgScores"),

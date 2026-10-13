@@ -208,6 +208,22 @@ class DownloadTest {
     }
 
     @Test
+    void tickersNewsPerSymbol() {
+        fake.onPost("/xhr/ncp").respondFixture("news/aapl-ncp-synthetic.json");
+
+        var news = yf.tickers("AAPL", "MSFT").news();
+
+        assertThat(news.keySet()).containsExactly("AAPL", "MSFT");
+        assertThat(news.get("AAPL")).isNotEmpty();
+        assertThat(fake.requests().stream()
+                        .filter(r -> r.uri().getPath().equals("/xhr/ncp"))
+                        .map(r -> r.bodyAsString().orElseThrow()))
+                .hasSize(2)
+                .anySatisfy(b -> assertThat(b).contains("\"AAPL\""))
+                .anySatisfy(b -> assertThat(b).contains("\"MSFT\""));
+    }
+
+    @Test
     void tickersHistoryIsStrict() {
         ok("AAPL");
         notFound("NOPE");

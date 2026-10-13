@@ -6,6 +6,7 @@ import io.andreygrigoriev.yfin.Ticker;
 import io.andreygrigoriev.yfin.YFinance;
 import io.andreygrigoriev.yfin.model.FinancialStatement;
 import io.andreygrigoriev.yfin.model.LineItem;
+import io.andreygrigoriev.yfin.model.ValuationMeasures;
 import io.andreygrigoriev.yfin.request.Frequency;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -45,6 +46,16 @@ class StatementsIT {
 
         FinancialStatement cash = t.cashFlow(Frequency.TRAILING);
         assertThat(cash.get(LineItem.OPERATING_CASH_FLOW)).isNotEmpty();
+    }
+
+    @Test
+    void valuationMeasures() {
+        ValuationMeasures v = yf.ticker("AAPL").valuationMeasures();
+
+        assertThat(v.periods()).hasSizeGreaterThanOrEqualTo(4);
+        assertThat(v.current("MarketCap")).isGreaterThan(1e11);
+        assertThat(v.get("PeRatio")).isNotEmpty();
+        assertThat(yf.ticker("SPY").valuationMeasures().isEmpty()).isTrue();
     }
 
     @Test

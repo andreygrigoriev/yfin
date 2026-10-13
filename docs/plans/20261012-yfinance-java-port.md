@@ -622,13 +622,23 @@ YFinanceException (RuntimeException)
 - [x] run `rtk ./mvnw verify` - must pass before next task
 
 ### Task 28: Verify acceptance criteria
-- [ ] walk the pinned yfinance public API (`Ticker`, `Tickers`, `download`, `Search`, `Lookup`, `Screener`, `EquityQuery`, `FundQuery`, `Sector`, `Industry`, `Market`, `WebSocket`) and confirm each has a Java counterpart or a documented reason for omission (deprecated upstream)
-- [ ] verify edge cases: delisted symbols, crypto/24h markets, non-US exchanges/timezones, empty data, rate-limit path
-- [ ] verify only intended packages are exported from each JPMS module
-- [ ] run full test suite: `rtk ./mvnw verify`
-- [ ] run live suite: `rtk ./mvnw verify -Plive`
-- [ ] run native tests: `rtk ./mvnw -Pnative test`; build and run `native-smoke` executable
-- [ ] verify every endpoint has normal, empty and error fixtures
+- [x] walk the pinned yfinance public API (`Ticker`, `Tickers`, `download`, `Search`, `Lookup`, `Screener`, `EquityQuery`, `FundQuery`, `Sector`, `Industry`, `Market`, `WebSocket`) and confirm each has a Java counterpart or a documented reason for omission (deprecated upstream) (walked yfinance 1.7.0 `__all__` + every `Ticker`/`TickerBase` accessor; gaps found and filled below)
+- [x] verify edge cases: delisted symbols, crypto/24h markets, non-US exchanges/timezones, empty data, rate-limit path (existing coverage: delisted/unknown fixtures for chart/quoteSummary/options/shares/earnings, BTC-USD UTC/24h fixtures, SAP.DE/CBA.AX timezone fixtures, empty fixtures per endpoint; ➕ end-to-end 429 → `YFRateLimitException` through `Ticker.history`)
+- [x] verify only intended packages are exported from each JPMS module (core: 5 public packages, asserted by `BuildSmokeTest`; live/tablesaw/dflib export only their API package; live opens `internal.proto` to protobuf only)
+- [x] run full test suite: `rtk ./mvnw verify` (core 526, live 23, tablesaw 10, dflib 10, it 13)
+- [x] run live suite: `rtk ./mvnw verify -Plive` (41 live ITs green, incl. new valuation/funds/SEC filings/PEG checks)
+- [x] run native tests: `rtk ./mvnw -Pnative test`; build and run `native-smoke` executable (all modules green on Oracle GraalVM 25; `native-smoke` built and `NativeSmokeIT` green live via `-Plive,native`)
+- [x] verify every endpoint has normal, empty and error fixtures (➕ recorded `timeseries/error-bad-request.json`; market time has no error payload — Yahoo answers any region with the default)
+- ➕ [x] `Ticker.valuationMeasures(Frequency)` / `valuationMeasures()` (yfinance `get_valuation_measures` / `valuation`), `Ticker.secFilings()` (`sec_filings`), `Ticker.fundsData()` (`funds_data`), `TickerInfo.trailingPegRatio()` (deferred from Task 10; `info()` now makes a third request), `Tickers.news()`; fixtures recorded live with yfinance 1.7.0's session
+- ⚠️ parity omissions for Task 29's README table:
+  - `Calendars` (market-wide earnings/IPO/economic-events/splits calendars): not ported — a separate ~550-line feature with its own query DSL and four result shapes over `/v1/finance/visualization`; out of scope for v1 verification, candidate for a later release
+  - `Auth.set_login_cookies` (Yahoo account T/Y cookies): not ported — needs user credentials; a custom `Transport` can add cookies
+  - `earnings` / `quarterly_earnings` / `get_earnings`: deprecated upstream, always `None`; use `incomeStatement` `NetIncome`
+  - `get_shares`: raises `YFNotImplementedError` upstream; use `sharesFull`
+  - `AsyncWebSocket`, `Ticker.live`, `Tickers.live`: use `yfin-live` (`YFinanceLive`); blocking API + virtual threads instead of asyncio
+  - `enable_debug_mode` → SLF4J logger levels; `set_tz_cache_location` / `config` → `YFinance.builder()` (`cacheDir`, `proxy`, `maxRetries`)
+  - `as_dict` / `pretty` flags and aliases (`incomestmt`, `financials`, `balancesheet`, `cashflow`, `ttm_*`): typed records, one name per statement, `Frequency.TRAILING`
+  - `get_valuation_measures(freq="monthly")`: no `Frequency.MONTHLY` (statements have no monthly series); `periods` cap not ported — all periods kept
 
 ### Task 29: [Final] Update documentation
 - [ ] `README.md`: install (Maven/Gradle coordinates per module), quickstart, examples per area, yfinance → yfin API mapping/parity table, rate-limit guidance, logging setup, GraalVM native-image notes (supported modules, any required flags), Yahoo ToS disclaimer (not affiliated; personal/research use)

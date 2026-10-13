@@ -1,11 +1,13 @@
 package io.andreygrigoriev.yfin;
 
 import io.andreygrigoriev.yfin.exception.YFDownloadException;
+import io.andreygrigoriev.yfin.model.NewsItem;
 import io.andreygrigoriev.yfin.model.PriceHistory;
 import io.andreygrigoriev.yfin.request.HistoryRequest;
 import io.andreygrigoriev.yfin.request.Period;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.SequencedSet;
@@ -70,6 +72,16 @@ public final class Tickers {
     /** Daily price history of the last month of every symbol. */
     public Map<String, PriceHistory> history() {
         return history(HistoryRequest.builder().build());
+    }
+
+    /**
+     * {@link Ticker#news()} of every symbol, in symbol order (yfinance {@code Tickers.news}); one
+     * request per symbol, made one after another. A failure for any symbol propagates.
+     */
+    public Map<String, List<NewsItem>> news() {
+        Map<String, List<NewsItem>> out = new LinkedHashMap<>();
+        tickers.forEach((symbol, ticker) -> out.put(symbol, ticker.news()));
+        return Collections.unmodifiableMap(out);
     }
 
     @Override

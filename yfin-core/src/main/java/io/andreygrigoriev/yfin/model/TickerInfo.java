@@ -215,6 +215,14 @@ public record TickerInfo(String symbol, Map<String, Object> raw) {
         return getDouble("forwardPE");
     }
 
+    /**
+     * The latest trailing PEG ratio, which yfinance adds to {@code info} from the fundamentals
+     * timeseries endpoint; {@code null} when Yahoo has none (ETFs, indices, crypto).
+     */
+    public @Nullable Double trailingPegRatio() {
+        return getDouble("trailingPegRatio");
+    }
+
     public @Nullable Double priceToBook() {
         return getDouble("priceToBook");
     }
