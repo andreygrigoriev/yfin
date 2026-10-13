@@ -43,6 +43,7 @@ class YFinanceTest {
             assertThat(yf.retryPolicy().maxRetries()).isEqualTo(RetryPolicy.DEFAULT_MAX_RETRIES);
             assertThat(yf.limiter().maxConcurrentRequests()).isEqualTo(RequestLimiter.DEFAULT_MAX_CONCURRENT_REQUESTS);
             assertThat(yf.repair()).isFalse();
+            assertThat(yf.proxy()).isEmpty();
             assertThat(yf.transport()).isInstanceOf(JdkTransport.class);
             assertThat(yf.mapper()).isSameAs(YahooJson.mapper());
         }
@@ -72,6 +73,7 @@ class YFinanceTest {
             assertThat(yf.connectTimeout()).isEqualTo(Duration.ofSeconds(3));
             assertThat(yf.requestTimeout()).isEqualTo(Duration.ofSeconds(4));
             assertThat(yf.userAgent()).isEqualTo("test-agent");
+            assertThat(yf.proxy()).containsSame(ProxySelector.getDefault());
             assertThat(yf.retryPolicy().maxRetries()).isZero();
             assertThat(yf.limiter().maxConcurrentRequests()).isEqualTo(2);
             assertThat(yf.repair()).isTrue();

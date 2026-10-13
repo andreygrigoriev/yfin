@@ -534,14 +534,19 @@ YFinanceException (RuntimeException)
 - Create: `yfin-live/src/main/java/io/andreygrigoriev/yfin/live/{YFinanceLive,LiveStream,PriceTick}.java`
 - Create: `yfin-live/src/main/java/io/andreygrigoriev/yfin/live/internal/{PricingDecoder,ReconnectPolicy}.java`
 - Create: `yfin-live/src/test/java/io/andreygrigoriev/yfin/live/*Test.java`
+- ➕ Created: `live/LiveListener.java` (onTick + default onError), `live/internal/StreamerProtocol.java` (JSON envelope via Jackson tree model), `test/.../TestWebSocketServer.java` (minimal RFC 6455 server on `ServerSocket`), fixtures `src/test/resources/fixtures/streamer/{aapl,btc-usd,eurusd}.json` (recorded from the live streamer)
+- ➕ Modify: `YFinance.java`: `connectTimeout()`/`userAgent()` made public, new `proxy()` accessor, so yfin-live can reuse the client config
+- ⚠️ Decision: protobuf generated with `io.github.ascopes:protobuf-maven-plugin` (fetches protoc from Maven Central, no local protoc); vendored proto only adds `java_*` options. The streamer accepts the default JDK TLS fingerprint (checked live), so `LiveStream` uses its own `HttpClient` without the Chrome cipher tuning
+- ⚠️ Decision: `PriceTick` keeps proto3 semantics (absent numbers = 0, absent strings = null); floats are widened to the shortest equivalent double like `MessageToDict`; `time` is `Instant` (epoch millis); `expireDate` stays a raw `long`
+- ⚠️ Decision: reconnect never gives up until `close()`; backoff 1s..30s with half-jitter; subscribing while disconnected updates the set, sent on reconnect; callbacks run on one ordered virtual thread
 
-- [ ] vendor `pricing.proto` from pinned yfinance; generate Java via protobuf-maven-plugin into an internal (non-exported) package
-- [ ] `PricingDecoder`: base64 → protobuf → `PriceTick` record (id, price, time, currency, exchange, quoteType, marketHours, changePercent, dayVolume, dayHigh, dayLow, change, …)
-- [ ] `LiveStream` over `java.net.http.WebSocket`: subscribe/unsubscribe, partial-message buffering, callbacks on virtual-thread executor, 15s heartbeat resubscribe, reconnect with backoff + resubscribe, `close()`
-- [ ] `YFinanceLive.connect(YFinance)` reuses client's proxy/user-agent config
-- [ ] write tests: decoder with recorded base64 samples; subscribe message JSON
-- [ ] write tests against a local WebSocket test server (minimal JDK-based or test-scope dependency): reconnect resubscribes, callbacks receive ticks, errors routed to `onError`
-- [ ] run `rtk ./mvnw verify` - must pass before next task
+- [x] vendor `pricing.proto` from pinned yfinance; generate Java via protobuf-maven-plugin into an internal (non-exported) package
+- [x] `PricingDecoder`: base64 → protobuf → `PriceTick` record (id, price, time, currency, exchange, quoteType, marketHours, changePercent, dayVolume, dayHigh, dayLow, change, …)
+- [x] `LiveStream` over `java.net.http.WebSocket`: subscribe/unsubscribe, partial-message buffering, callbacks on virtual-thread executor, 15s heartbeat resubscribe, reconnect with backoff + resubscribe, `close()`
+- [x] `YFinanceLive.connect(YFinance)` reuses client's proxy/user-agent config
+- [x] write tests: decoder with recorded base64 samples; subscribe message JSON
+- [x] write tests against a local WebSocket test server (minimal JDK-based or test-scope dependency): reconnect resubscribes, callbacks receive ticks, errors routed to `onError`
+- [x] run `rtk ./mvnw verify` - must pass before next task
 
 ### Task 23: Tablesaw adapter
 

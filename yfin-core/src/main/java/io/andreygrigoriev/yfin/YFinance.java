@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.SequencedSet;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -71,6 +72,7 @@ public final class YFinance implements AutoCloseable {
     private final Duration connectTimeout;
     private final Duration requestTimeout;
     private final String userAgent;
+    private final @Nullable ProxySelector proxy;
     private final AtomicBoolean closed = new AtomicBoolean();
     private final Object sessionLock = new Object();
     private volatile @Nullable YahooSession session;
@@ -79,6 +81,7 @@ public final class YFinance implements AutoCloseable {
         this.connectTimeout = b.connectTimeout;
         this.requestTimeout = b.requestTimeout;
         this.userAgent = b.userAgent;
+        this.proxy = b.proxy;
         this.repair = b.repair;
         this.limiter = new RequestLimiter(b.maxConcurrentRequests);
         this.retry = RetryPolicy.of(b.maxRetries);
@@ -435,7 +438,8 @@ public final class YFinance implements AutoCloseable {
         return retry;
     }
 
-    Duration connectTimeout() {
+    /** Connect timeout from the builder; also used by {@code yfin-live} for its WebSocket. */
+    public Duration connectTimeout() {
         return connectTimeout;
     }
 
@@ -443,8 +447,14 @@ public final class YFinance implements AutoCloseable {
         return requestTimeout;
     }
 
-    String userAgent() {
+    /** User-Agent from the builder; also sent by {@code yfin-live} on its WebSocket handshake. */
+    public String userAgent() {
         return userAgent;
+    }
+
+    /** Proxy selector from the builder, empty for direct connections. */
+    public Optional<ProxySelector> proxy() {
+        return Optional.ofNullable(proxy);
     }
 
     void ensureOpen() {
