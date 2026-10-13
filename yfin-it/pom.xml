@@ -54,6 +54,34 @@
                 </plugins>
             </build>
         </profile>
+        <!-- with -Pnative, package also builds the NativeSmoke consumer app as target/native-smoke using
+             only the plugin defaults (no yfin-specific flags); NativeSmokeIT runs it under -Plive -->
+        <profile>
+            <id>native</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.graalvm.buildtools</groupId>
+                        <artifactId>native-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>native-smoke</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>compile-no-fork</goal>
+                                </goals>
+                                <configuration>
+                                    <mainClass>io.andreygrigoriev.yfin.it.smoke.NativeSmoke</mainClass>
+                                    <imageName>native-smoke</imageName>
+                                    <!-- internal module: no SBOM (Oracle GraalVM would attach one to install/deploy) -->
+                                    <skipBaseSBOM>true</skipBaseSBOM>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
     </profiles>
 
     <dependencies>

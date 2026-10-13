@@ -1,0 +1,14 @@
+{
+  "comment": "yfin-live: PricingData is decoded with generated parseFrom/getters only, so no message reflection is needed. protobuf-java looks up the full ExtensionRegistry by name (it falls back to the lite registry without this entry).",
+  "reflection": [
+    {
+      "type": "com.google.protobuf.ExtensionRegistry",
+      "methods": [
+        {
+          "name": "getEmptyRegistry",
+          "parameterTypes": []
+        }
+      ]
+    }
+  ]
+}

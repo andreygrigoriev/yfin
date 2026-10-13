@@ -1,0 +1,5 @@
+{
+  "comment": "yfin-core parses JSON with the Jackson tree model and serializes only JDK maps/lists/strings/numbers, so it needs no reflection or resource entries. Add any reflectively bound DTO or runtime-loaded resource here.",
+  "reflection": [],
+  "resources": []
+}

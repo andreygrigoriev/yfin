@@ -596,15 +596,18 @@ YFinanceException (RuntimeException)
 - Create/Modify: `yfin-core/src/main/resources/META-INF/native-image/io.andreygrigoriev/yfin-core/reachability-metadata.json`
 - Create/Modify: `yfin-live/src/main/resources/META-INF/native-image/io.andreygrigoriev/yfin-live/reachability-metadata.json`
 - Create: `yfin-it/src/test/java/io/andreygrigoriev/yfin/it/NativeSmokeIT.java`
-- Create: `yfin-it/native-smoke/` (minimal consumer app: history + info + statements + 10s live stream)
+- ~~Create: `yfin-it/native-smoke/`~~ ➕ Create: `yfin-it/src/main/java/io/andreygrigoriev/yfin/it/smoke/NativeSmoke.java` (minimal consumer app: history + info + statements + 10s live stream), built as `yfin-it/target/native-smoke` by yfin-it's `native` profile
+- ➕ Create: `yfin-core/src/test/resources/META-INF/native-image/io.andreygrigoriev/yfin-core-tests/reachability-metadata.json`, `yfin-live/src/test/...-tests/reachability-metadata.json` (test-only resources/reflection)
+- ➕ Create: `yfin-tablesaw/src/main/resources/META-INF/native-image/io.andreygrigoriev/yfin-tablesaw/reachability-metadata.json` (ClassGraph handlers)
+- ➕ Create: `README.md` (native-image section only; Task 29 writes the rest)
 
-- [ ] add `native` profile running unit tests as native image (`./mvnw -Pnative test` on GraalVM 25)
-- [ ] run native tests for `yfin-core` and `yfin-live`; fill gaps in reachability metadata found by failures (use the native-image tracing agent on the JVM test run to discover missing entries, then review and trim the generated file by hand)
-- [ ] verify protobuf generated classes work in native image (register descriptors/reflection as needed)
-- [ ] verify JDK `HttpClient` TLS + `WebSocket` work in native image (enable `--enable-url-protocols=https`; `--enable-http` not needed for https only — document required flags, ideally none beyond defaults via `native-image.properties`)
-- [ ] build `native-smoke` consumer app as native executable with no extra config; run it against live Yahoo in `-Plive -Pnative`
-- [ ] adapters: run native tests on a best-effort basis; document status per adapter in README
-- [ ] run `rtk ./mvnw verify` and `rtk ./mvnw -Pnative test` - must pass before next task
+- [x] add `native` profile running unit tests as native image (`./mvnw -Pnative test` on GraalVM 25) (native-maven-plugin 1.1.14; metadata repository disabled so runs prove the shipped metadata suffices)
+- [x] run native tests for `yfin-core` and `yfin-live`; fill gaps in reachability metadata found by failures (use the native-image tracing agent on the JVM test run to discover missing entries, then review and trim the generated file by hand) (core main code needs nothing: tree-model Jackson; only test-side entries for repair CSVs and `LineItem` field reflection; `BuildSmokeTest` module-graph checks `@DisabledInNativeImage`)
+- [x] verify protobuf generated classes work in native image (register descriptors/reflection as needed) (only `ExtensionRegistry.getEmptyRegistry` reflective lookup registered)
+- [x] verify JDK `HttpClient` TLS + `WebSocket` work in native image (enable `--enable-url-protocols=https`; `--enable-http` not needed for https only — document required flags, ideally none beyond defaults via `native-image.properties`) (no flags and no `native-image.properties` needed on GraalVM 25)
+- [x] build `native-smoke` consumer app as native executable with no extra config; run it against live Yahoo in `-Plive -Pnative` (`NativeSmokeIT` green: history, info, statements, live tick)
+- [x] adapters: run native tests on a best-effort basis; document status per adapter in README (both pass: Tablesaw needs ClassGraph handler metadata, shipped in yfin-tablesaw; DFLib needs none)
+- [x] run `rtk ./mvnw verify` and `rtk ./mvnw -Pnative test` - must pass before next task (native on Oracle GraalVM 25+37.1: core 503, live 23, tablesaw 10, dflib 10, it 13 tests green)
 
 ### Task 27: CI and release pipeline
 

@@ -58,6 +58,7 @@
         <exec-maven-plugin.version>3.5.1</exec-maven-plugin.version>
         <protobuf-maven-plugin.version>5.1.11</protobuf-maven-plugin.version>
         <palantir-java-format.version>2.102.0</palantir-java-format.version>
+        <native-maven-plugin.version>1.1.14</native-maven-plugin.version>
     </properties>
 
     <dependencyManagement>
@@ -218,6 +219,11 @@
                     <artifactId>protobuf-maven-plugin</artifactId>
                     <version>${protobuf-maven-plugin.version}</version>
                 </plugin>
+                <plugin>
+                    <groupId>org.graalvm.buildtools</groupId>
+                    <artifactId>native-maven-plugin</artifactId>
+                    <version>${native-maven-plugin.version}</version>
+                </plugin>
             </plugins>
         </pluginManagement>
 
@@ -269,4 +275,35 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!-- runs every module's unit tests a second time as a native image: ./mvnw -Pnative test (GraalVM 25 as JAVA_HOME) -->
+        <profile>
+            <id>native</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.graalvm.buildtools</groupId>
+                        <artifactId>native-maven-plugin</artifactId>
+                        <extensions>true</extensions>
+                        <configuration>
+                            <!-- off so the native runs prove yfin's own shipped metadata is sufficient -->
+                            <metadataRepository>
+                                <enabled>false</enabled>
+                            </metadataRepository>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>test-native</id>
+                                <phase>test</phase>
+                                <goals>
+                                    <goal>test</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

@@ -1,0 +1,85 @@
+{
+  "comment": "Tablesaw's Table static initializer runs a ClassGraph classpath scan (to auto-register readers/writers); ClassGraph looks up its classloader handlers' static methods reflectively. In a native image the scan finds nothing, which is harmless for the adapter (no Tablesaw I/O is used).",
+  "reflection": [
+    {
+      "type": "nonapi.io.github.classgraph.classloaderhandler.AntClassLoaderHandler",
+      "allDeclaredMethods": true
+    },
+    {
+      "type": "nonapi.io.github.classgraph.classloaderhandler.ClassGraphClassLoaderHandler",
+      "allDeclaredMethods": true
+    },
+    {
+      "type": "nonapi.io.github.classgraph.classloaderhandler.CxfContainerClassLoaderHandler",
+      "allDeclaredMethods": true
+    },
+    {
+      "type": "nonapi.io.github.classgraph.classloaderhandler.EquinoxClassLoaderHandler",
+      "allDeclaredMethods": true
+    },
+    {
+      "type": "nonapi.io.github.classgraph.classloaderhandler.EquinoxContextFinderClassLoaderHandler",
+      "allDeclaredMethods": true
+    },
+    {
+      "type": "nonapi.io.github.classgraph.classloaderhandler.FallbackClassLoaderHandler",
+      "allDeclaredMethods": true
+    },
+    {
+      "type": "nonapi.io.github.classgraph.classloaderhandler.FelixClassLoaderHandler",
+      "allDeclaredMethods": true
+    },
+    {
+      "type": "nonapi.io.github.classgraph.classloaderhandler.JBossClassLoaderHandler",
+      "allDeclaredMethods": true
+    },
+    {
+      "type": "nonapi.io.github.classgraph.classloaderhandler.JPMSClassLoaderHandler",
+      "allDeclaredMethods": true
+    },
+    {
+      "type": "nonapi.io.github.classgraph.classloaderhandler.OSGiDefaultClassLoaderHandler",
+      "allDeclaredMethods": true
+    },
+    {
+      "type": "nonapi.io.github.classgraph.classloaderhandler.ParentLastDelegationOrderTestClassLoaderHandler",
+      "allDeclaredMethods": true
+    },
+    {
+      "type": "nonapi.io.github.classgraph.classloaderhandler.PlexusClassWorldsClassRealmClassLoaderHandler",
+      "allDeclaredMethods": true
+    },
+    {
+      "type": "nonapi.io.github.classgraph.classloaderhandler.QuarkusClassLoaderHandler",
+      "allDeclaredMethods": true
+    },
+    {
+      "type": "nonapi.io.github.classgraph.classloaderhandler.SpringBootRestartClassLoaderHandler",
+      "allDeclaredMethods": true
+    },
+    {
+      "type": "nonapi.io.github.classgraph.classloaderhandler.TomcatWebappClassLoaderBaseHandler",
+      "allDeclaredMethods": true
+    },
+    {
+      "type": "nonapi.io.github.classgraph.classloaderhandler.UnoOneJarClassLoaderHandler",
+      "allDeclaredMethods": true
+    },
+    {
+      "type": "nonapi.io.github.classgraph.classloaderhandler.URLClassLoaderHandler",
+      "allDeclaredMethods": true
+    },
+    {
+      "type": "nonapi.io.github.classgraph.classloaderhandler.WeblogicClassLoaderHandler",
+      "allDeclaredMethods": true
+    },
+    {
+      "type": "nonapi.io.github.classgraph.classloaderhandler.WebsphereLibertyClassLoaderHandler",
+      "allDeclaredMethods": true
+    },
+    {
+      "type": "nonapi.io.github.classgraph.classloaderhandler.WebsphereTraditionalClassLoaderHandler",
+      "allDeclaredMethods": true
+    }
+  ]
+}

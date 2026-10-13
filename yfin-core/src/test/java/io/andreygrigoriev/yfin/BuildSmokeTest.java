@@ -5,7 +5,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.lang.module.ModuleDescriptor;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledInNativeImage;
 
+// a native image has no module graph to inspect
+@DisabledInNativeImage
 class BuildSmokeTest {
 
     private static ModuleDescriptor descriptor() {
