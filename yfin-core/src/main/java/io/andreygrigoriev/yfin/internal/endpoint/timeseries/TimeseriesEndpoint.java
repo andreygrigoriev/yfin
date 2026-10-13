@@ -10,7 +10,10 @@ import io.andreygrigoriev.yfin.model.ValuationMeasures;
 import io.andreygrigoriev.yfin.request.Frequency;
 import io.andreygrigoriev.yfin.spi.HttpRequest;
 import java.net.URI;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -18,7 +21,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,7 +33,8 @@ public final class TimeseriesEndpoint {
 
     private static final Logger LOG = LoggerFactory.getLogger(TimeseriesEndpoint.class);
 
-    static final String BASE_URL = "https://query2.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/";
+    public static final String BASE_URL =
+            "https://query2.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/";
 
     /** Line item keys per request. */
     static final int CHUNK_KEYS = 60;
@@ -43,19 +46,19 @@ public final class TimeseriesEndpoint {
     static final long PERIOD1 = 1_483_142_400L;
 
     /** The info complement yfinance fetches from this endpoint. */
-    static final String TRAILING_PEG_RATIO = "trailingPegRatio";
+    public static final String TRAILING_PEG_RATIO = "trailingPegRatio";
 
     /** Look-back of the {@code trailingPegRatio} request: half a year, as in yfinance. */
     static final long PEG_LOOKBACK_DAYS = 365 / 2;
 
     private final YahooSession session;
-    private final Supplier<Instant> clock;
+    private final Clock clock;
 
     public TimeseriesEndpoint(YahooSession session) {
-        this(session, Instant::now);
+        this(session, Clock.systemUTC());
     }
 
-    TimeseriesEndpoint(YahooSession session, Supplier<Instant> clock) {
+    TimeseriesEndpoint(YahooSession session, Clock clock) {
         this.session = Objects.requireNonNull(session, "session");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
@@ -108,7 +111,7 @@ public final class TimeseriesEndpoint {
      */
     public Optional<Double> trailingPegRatio(String symbol) {
         Objects.requireNonNull(symbol, "symbol");
-        long period1 = clock.get()
+        long period1 = clock.instant()
                 .truncatedTo(ChronoUnit.DAYS)
                 .minus(PEG_LOOKBACK_DAYS, ChronoUnit.DAYS)
                 .getEpochSecond();
@@ -156,14 +159,19 @@ public final class TimeseriesEndpoint {
         params.put("symbol", symbol);
         params.put("type", String.join(",", types));
         params.put("period1", Long.toString(period1));
-        params.put("period2", Long.toString(period2(clock.get())));
+        params.put("period2", Long.toString(period2(clock.instant())));
         return params;
     }
 
     /** {@code now} rounded up to the next UTC midnight, in epoch seconds. */
     static long period2(Instant now) {
-        Instant day = now.truncatedTo(ChronoUnit.DAYS);
-        return (day.equals(now) ? day : day.plus(1, ChronoUnit.DAYS)).getEpochSecond();
+        return ceilDay(now.atZone(ZoneOffset.UTC)).toEpochSecond();
+    }
+
+    /** {@code time} rounded up to the next midnight of its zone. */
+    public static ZonedDateTime ceilDay(ZonedDateTime time) {
+        ZonedDateTime day = time.toLocalDate().atStartOfDay(time.getZone());
+        return day.equals(time) ? day : time.toLocalDate().plusDays(1).atStartOfDay(time.getZone());
     }
 
     /** The {@code result} list; empty when Yahoo returns none. */

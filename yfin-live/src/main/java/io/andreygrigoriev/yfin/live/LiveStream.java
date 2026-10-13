@@ -49,7 +49,7 @@ import org.slf4j.LoggerFactory;
  */
 public final class LiveStream implements AutoCloseable {
 
-    private static final Logger log = LoggerFactory.getLogger(LiveStream.class);
+    private static final Logger LOG = LoggerFactory.getLogger(LiveStream.class);
 
     private final URI uri;
     private final String userAgent;
@@ -109,7 +109,7 @@ public final class LiveStream implements AutoCloseable {
         }
         long heartbeat = b.heartbeatInterval.toNanos();
         scheduler.scheduleAtFixedRate(this::heartbeat, heartbeat, heartbeat, TimeUnit.NANOSECONDS);
-        log.debug("connected to {}", uri);
+        LOG.debug("connected to {}", uri);
     }
 
     /** Same as {@link #subscribe(Collection)}. */
@@ -204,13 +204,13 @@ public final class LiveStream implements AutoCloseable {
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             } catch (ExecutionException | TimeoutException e) {
-                log.debug("close handshake failed: {}", e.toString());
+                LOG.debug("close handshake failed: {}", e.toString());
             } finally {
                 ws.abort();
             }
         }
         shutdownExecutors();
-        log.debug("closed stream to {}", uri);
+        LOG.debug("closed stream to {}", uri);
     }
 
     @Override
@@ -308,7 +308,7 @@ public final class LiveStream implements AutoCloseable {
         if (old != null) {
             old.abort();
         }
-        log.warn("{}; reconnecting", error.getMessage());
+        LOG.warn("{}; reconnecting", error.getMessage());
         dispatchError(error);
         scheduleReconnectLocked();
     }
@@ -344,7 +344,7 @@ public final class LiveStream implements AutoCloseable {
                     return;
                 }
                 failedAttempts++;
-                log.warn("reconnect failed ({} consecutive failures): {}", failedAttempts, e.getMessage());
+                LOG.warn("reconnect failed ({} consecutive failures): {}", failedAttempts, e.getMessage());
                 dispatchError(e);
                 scheduleReconnectLocked();
             }
@@ -358,7 +358,7 @@ public final class LiveStream implements AutoCloseable {
                     return;
                 }
                 socket = ws;
-                log.info("reconnected to {}", uri);
+                LOG.info("reconnected to {}", uri);
                 if (!subscriptions.isEmpty()) {
                     out = outgoingLocked(StreamerProtocol.subscribe(subscriptions));
                 }
@@ -393,7 +393,7 @@ public final class LiveStream implements AutoCloseable {
         try {
             tick = StreamerProtocol.decodeFrame(frame);
         } catch (YFDataException e) {
-            log.debug("undecodable frame: {}", e.getMessage());
+            LOG.debug("undecodable frame: {}", e.getMessage());
             notifyError(e);
             return;
         }
@@ -403,7 +403,7 @@ public final class LiveStream implements AutoCloseable {
         try {
             listener.onTick(tick);
         } catch (RuntimeException e) {
-            log.debug("onTick threw", e);
+            LOG.debug("onTick threw", e);
             notifyError(e);
         }
     }
@@ -420,7 +420,7 @@ public final class LiveStream implements AutoCloseable {
         try {
             listener.onError(error);
         } catch (RuntimeException e) {
-            log.warn("onError threw", e);
+            LOG.warn("onError threw", e);
         }
     }
 

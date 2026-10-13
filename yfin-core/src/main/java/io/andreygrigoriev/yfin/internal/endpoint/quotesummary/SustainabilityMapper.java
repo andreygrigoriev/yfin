@@ -19,7 +19,6 @@ public final class SustainabilityMapper {
     private SustainabilityMapper() {}
 
     /** {@code esgScores}; empty when the module is missing. */
-    @SuppressWarnings("unchecked")
     public static Optional<Sustainability> sustainability(@Nullable JsonNode module) {
         if (module == null || !module.isObject()) {
             return Optional.empty();
@@ -30,8 +29,7 @@ public final class SustainabilityMapper {
                 controversies.add(c.textValue());
             }
         }
-        Object plain = YahooJson.toPlain(module);
-        Map<String, Object> raw = plain instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
+        Map<String, Object> raw = YahooJson.plainMap(module);
         return Optional.of(new Sustainability(
                 dbl(module, "totalEsg"),
                 dbl(module, "environmentScore"),

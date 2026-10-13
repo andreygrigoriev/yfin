@@ -3,6 +3,7 @@ package io.andreygrigoriev.yfin.internal.endpoint.chart;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.andreygrigoriev.yfin.exception.YFDataException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -114,7 +115,7 @@ record ChartDto(
     private static double[] prices(JsonNode node, int n, String name) {
         double[] values = new double[n];
         if (node.isMissingNode() || node.isNull()) {
-            java.util.Arrays.fill(values, Double.NaN);
+            Arrays.fill(values, Double.NaN);
             return values;
         }
         checkArray(node, n, name);

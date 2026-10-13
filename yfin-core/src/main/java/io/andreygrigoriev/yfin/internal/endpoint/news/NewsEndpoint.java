@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.andreygrigoriev.yfin.exception.YFDataException;
 import io.andreygrigoriev.yfin.internal.endpoint.Uris;
+import io.andreygrigoriev.yfin.internal.endpoint.search.SearchEndpoint;
 import io.andreygrigoriev.yfin.internal.http.YahooJson;
 import io.andreygrigoriev.yfin.internal.http.YahooSession;
 import io.andreygrigoriev.yfin.model.NewsItem;
@@ -37,7 +38,6 @@ public final class NewsEndpoint {
     private static final Logger LOG = LoggerFactory.getLogger(NewsEndpoint.class);
 
     static final String NCP_URL = "https://finance.yahoo.com/xhr/ncp";
-    static final String SEARCH_URL = "https://query2.finance.yahoo.com/v1/finance/search";
 
     private final YahooSession session;
 
@@ -78,7 +78,7 @@ public final class NewsEndpoint {
         params.put("quotesCount", "0");
         params.put("newsCount", Integer.toString(count));
         params.put("enableFuzzyQuery", "false");
-        HttpRequest request = HttpRequest.get(Uris.uri(SEARCH_URL, params));
+        HttpRequest request = HttpRequest.get(Uris.uri(SearchEndpoint.URL, params));
         LOG.debug("{}: GET {}", symbol, request.uri());
         HttpResponse response = session.execute(request);
         YahooJson.checkNotDown(response);

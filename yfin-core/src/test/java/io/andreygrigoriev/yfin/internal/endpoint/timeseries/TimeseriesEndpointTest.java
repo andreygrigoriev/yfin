@@ -12,7 +12,9 @@ import io.andreygrigoriev.yfin.spi.HttpRequest;
 import io.andreygrigoriev.yfin.testing.FakeTransport;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -91,7 +93,7 @@ class TimeseriesEndpointTest {
                         Cache.none(),
                         new io.andreygrigoriev.yfin.internal.http.RequestLimiter(1),
                         io.andreygrigoriev.yfin.internal.http.RetryPolicy.of(0)),
-                () -> Instant.parse("2026-01-01T12:00:00Z"));
+                Clock.fixed(Instant.parse("2026-01-01T12:00:00Z"), ZoneOffset.UTC));
 
         Map<String, String> params = endpoint.params("MSFT", "quarterly", List.of("TotalRevenue", "NetIncome"));
 

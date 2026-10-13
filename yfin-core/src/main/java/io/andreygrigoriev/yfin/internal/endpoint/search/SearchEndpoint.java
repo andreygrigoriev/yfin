@@ -30,7 +30,7 @@ public final class SearchEndpoint {
 
     private static final Logger LOG = LoggerFactory.getLogger(SearchEndpoint.class);
 
-    static final String URL = "https://query2.finance.yahoo.com/v1/finance/search";
+    public static final String URL = "https://query2.finance.yahoo.com/v1/finance/search";
 
     private final YahooSession session;
 
@@ -98,7 +98,7 @@ public final class SearchEndpoint {
                     text(q.path("exchDisp")),
                     text(q.path("sector")),
                     text(q.path("industry")),
-                    Plain.number(q.path("score")),
+                    YahooJson.number(q.path("score")),
                     plainMap(q)));
         }
         return out;

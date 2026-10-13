@@ -12,8 +12,10 @@ import io.andreygrigoriev.yfin.internal.repair.Frame.Col;
 import io.andreygrigoriev.yfin.request.Interval;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.slf4j.Logger;
@@ -108,7 +110,7 @@ final class Zeroes {
         // a split means trading happened
         for (int i = 0; i < n; i++) {
             if (df2.get(SPLITS, i) != 0.0 && !change[i]) {
-                java.util.Arrays.fill(bad[i], true);
+                Arrays.fill(bad[i], true);
             }
         }
 
@@ -164,7 +166,7 @@ final class Zeroes {
         for (int i = 0; i < df.size(); i++) {
             origRow.putIfAbsent(df.time(i).toInstant(), i);
         }
-        Set<Col> data = new HashSet<>(java.util.List.of(PRICES));
+        Set<Col> data = new HashSet<>(List.of(PRICES));
         data.add(VOLUME);
         for (int i = 0; i < df2.size(); i++) {
             for (Col c : data) {

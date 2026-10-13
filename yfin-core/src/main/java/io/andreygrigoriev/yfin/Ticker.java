@@ -56,13 +56,13 @@ import io.andreygrigoriev.yfin.request.HistoryRequest;
 import io.andreygrigoriev.yfin.request.Interval;
 import io.andreygrigoriev.yfin.request.NewsTab;
 import io.andreygrigoriev.yfin.request.Period;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.function.Supplier;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -159,9 +159,8 @@ public final class Ticker {
      * never an error.
      */
     public TickerInfo info() {
-        Map<QuoteSummaryModule, JsonNode> modules =
-                new QuoteSummaryEndpoint(client.session()).fetch(symbol, InfoMapper.INFO_MODULES);
-        JsonNode quote = new QuoteEndpoint(client.session()).quote(symbol).orElse(null);
+        Map<QuoteSummaryModule, JsonNode> modules = quoteSummaryEndpoint().fetch(symbol, InfoMapper.INFO_MODULES);
+        JsonNode quote = quoteEndpoint().quote(symbol).orElse(null);
         Double peg =
                 modules.isEmpty() ? null : timeseries().trailingPegRatio(symbol).orElse(null);
         return InfoMapper.map(symbol, modules, quote, peg);
@@ -173,11 +172,11 @@ public final class Ticker {
      * most once per returned instance.
      */
     public FastInfo fastInfo() {
-        return fastInfo(Instant::now);
+        return fastInfo(Clock.systemUTC());
     }
 
     /** {@link #fastInfo()} with a custom clock, for tests. */
-    FastInfo fastInfo(Supplier<Instant> clock) {
+    FastInfo fastInfo(Clock clock) {
         return new FastInfo(new FastInfo.Source() {
             @Override
             public PriceHistory yearDaily() {
@@ -191,17 +190,13 @@ public final class Ticker {
             }
 
             @Override
-            @SuppressWarnings("unchecked")
             public Map<String, Object> quote() {
-                return new QuoteEndpoint(client.session())
-                        .quote(symbol)
-                        .map(q -> (Map<String, Object>) YahooJson.toPlain(q))
-                        .orElse(Map.of());
+                return quoteEndpoint().quote(symbol).map(YahooJson::plainMap).orElse(Map.of());
             }
 
             @Override
             public Instant now() {
-                return clock.get();
+                return clock.instant();
             }
 
             @Override
@@ -291,8 +286,7 @@ public final class Ticker {
      * request. Empty when Yahoo has none.
      */
     public List<GrowthEstimate> growthEstimates() {
-        return AnalystMapper.growthEstimates(
-                new QuoteSummaryEndpoint(client.session()).fetch(symbol, AnalystMapper.GROWTH_MODULES));
+        return AnalystMapper.growthEstimates(quoteSummaryEndpoint().fetch(symbol, AnalystMapper.GROWTH_MODULES));
     }
 
     /** Next earnings date with estimate ranges, and dividend dates; empty when Yahoo has none. */
@@ -407,8 +401,7 @@ public final class Ticker {
      * data found").
      */
     public Optional<FundsData> fundsData() {
-        return FundsMapper.fundsData(
-                symbol, new QuoteSummaryEndpoint(client.session()).fetch(symbol, FundsMapper.FUND_MODULES));
+        return FundsMapper.fundsData(symbol, quoteSummaryEndpoint().fetch(symbol, FundsMapper.FUND_MODULES));
     }
 
     /** {@link #news(int, NewsTab)} with yfinance's defaults: 10 articles of {@link NewsTab#NEWS}. */
@@ -458,11 +451,9 @@ public final class Ticker {
         return new IsinEndpoint(
                         client.session(),
                         client.cache(),
-                        s -> new QuoteEndpoint(client.session())
+                        s -> quoteEndpoint()
                                 .quote(s)
-                                .map(q -> q.path("shortName").asText("").isEmpty()
-                                        ? s
-                                        : q.path("shortName").asText()))
+                                .map(q -> Objects.requireNonNullElse(YahooJson.text(q.path("shortName")), s)))
                 .isin(symbol);
     }
 
@@ -472,14 +463,20 @@ public final class Ticker {
 
     /** One {@code quoteSummary} module, or {@code null} when Yahoo has no data for it. */
     private @Nullable JsonNode module(QuoteSummaryModule module) {
-        return new QuoteSummaryEndpoint(client.session())
-                .fetch(symbol, List.of(module))
-                .get(module);
+        return quoteSummaryEndpoint().fetch(symbol, List.of(module)).get(module);
     }
 
     private FinancialStatement statement(StatementKeys statement, Frequency frequency) {
         Objects.requireNonNull(frequency, "frequency");
         return timeseries().statement(symbol, statement, frequency);
+    }
+
+    private QuoteEndpoint quoteEndpoint() {
+        return new QuoteEndpoint(client.session());
+    }
+
+    private QuoteSummaryEndpoint quoteSummaryEndpoint() {
+        return new QuoteSummaryEndpoint(client.session());
     }
 
     private TimeseriesEndpoint timeseries() {

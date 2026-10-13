@@ -19,6 +19,7 @@ import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -55,9 +56,9 @@ final class Resample {
         }
         Frame out = new Frame(times, src.hasCapitalGains());
         for (Col c : new Col[] {OPEN, HIGH, LOW, CLOSE, ADJ_CLOSE}) {
-            java.util.Arrays.fill(out.col(c), Double.NaN);
+            Arrays.fill(out.col(c), Double.NaN);
         }
-        java.util.Arrays.fill(out.col(SPLITS), 1.0);
+        Arrays.fill(out.col(SPLITS), 1.0);
         int b = 0;
         for (int i = 0; i < src.size(); i++) {
             LocalDate d = src.time(i).toLocalDate();

@@ -158,6 +158,16 @@ public final class YahooJson {
         return node.isTextual() && !node.asText().isEmpty() ? node.asText() : null;
     }
 
+    /** The node's number as a double, or {@code null} when it is not a number. */
+    public static @Nullable Double number(JsonNode node) {
+        return node.isNumber() ? node.doubleValue() : null;
+    }
+
+    /** The node's number as a long, or {@code null} when it is not a number that fits a long. */
+    public static @Nullable Long integral(JsonNode node) {
+        return node.isNumber() && node.canConvertToLong() ? node.longValue() : null;
+    }
+
     /** {@link #toPlain} of an object node; an empty map for anything else. */
     @SuppressWarnings("unchecked")
     public static Map<String, Object> plainMap(JsonNode node) {

@@ -12,9 +12,11 @@ import io.andreygrigoriev.yfin.request.Period;
 import io.andreygrigoriev.yfin.spi.Cache;
 import io.andreygrigoriev.yfin.spi.HttpRequest;
 import io.andreygrigoriev.yfin.testing.FakeTransport;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -76,7 +78,7 @@ class FastInfoTest {
         chart("AAPL", "5d", "1h", "aapl-1h-5d-prepost.json");
         quote("AAPL", "aapl.json");
 
-        FastInfo fi = yf.ticker("AAPL").fastInfo(() -> RECORDED);
+        FastInfo fi = yf.ticker("AAPL").fastInfo(Clock.fixed(RECORDED, ZoneOffset.UTC));
 
         assertThat(fi.currency()).isEqualTo("USD");
         assertThat(fi.quoteType()).isEqualTo("EQUITY");
@@ -117,7 +119,7 @@ class FastInfoTest {
         chart("BTC-USD", "1y", "1d", "btc-usd-1d-1y.json");
         quote("BTC-USD", "btc-usd.json");
 
-        FastInfo fi = yf.ticker("BTC-USD").fastInfo(() -> RECORDED);
+        FastInfo fi = yf.ticker("BTC-USD").fastInfo(Clock.fixed(RECORDED, ZoneOffset.UTC));
 
         assertThat(fi.timezone()).isEqualTo(ZoneId.of("UTC"));
         assertThat(fi.quoteType()).isEqualTo("CRYPTOCURRENCY");
@@ -137,7 +139,7 @@ class FastInfoTest {
         chart("AAPL", "1y", "1d", "aapl-1d-1y.json");
         Ticker aapl = yf.ticker("AAPL");
         // Tuesday 2026-10-13 11:21 New York: Monday's bar is complete, and no newer bar exists
-        FastInfo fi = aapl.fastInfo(() -> RECORDED.plus(Duration.ofDays(1)));
+        FastInfo fi = aapl.fastInfo(Clock.fixed(RECORDED.plus(Duration.ofDays(1)), ZoneOffset.UTC));
 
         List<Bar> bars = aapl.history(HistoryRequest.builder()
                         .period(Period.ONE_YEAR)

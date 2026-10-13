@@ -18,10 +18,13 @@ import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeSet;
+import java.util.stream.IntStream;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,6 +43,13 @@ final class Reconstruct {
 
     private static final Col[] PRICES = Frame.PRICES;
     private static final Col[] DATA = {OPEN, HIGH, LOW, CLOSE, ADJ_CLOSE, VOLUME};
+
+    /** Finer data older than this many days is not served for 1h bars. */
+    private static final long MAX_HOURLY_AGE_DAYS = 729;
+    /** Finer data older than this many days is not served for 30m/15m bars. */
+    private static final long MAX_MINUTE_AGE_DAYS = 59;
+    /** A calibration ratio within this of 1 (or of 100, 0.01) counts as that value. */
+    private static final double CALIBRATION_TOLERANCE = 0.1;
 
     private static final Map<Interval, Interval> NEXT = new LinkedHashMap<>();
 
@@ -64,8 +74,9 @@ final class Reconstruct {
         if (interval == Interval.ONE_MINUTE) {
             return input;
         }
-        boolean intraday = !Intervals.interday(interval);
-        if (!intraday) {
+        // shorter than a day (5d counts too): unlike Interval.isIntraday()
+        boolean subDaily = !Intervals.interday(interval);
+        if (!subDaily) {
             prepost = true; // interday data always includes pre and post market
         }
         Interval sub = NEXT.get(interval);
@@ -89,18 +100,10 @@ final class Reconstruct {
         int n = df.size();
         boolean[] repairRow = new boolean[n];
         for (int i = 0; i < n; i++) {
-            for (Col c : DATA) {
-                repairRow[i] |= df.get(c, i) == TAG;
-            }
+            repairRow[i] = isTagged(df, i, DATA);
         }
-
-        @Nullable ZonedDateTime minDt = null;
-        Duration lookback = minLookback(sub);
-        if (lookback != null) {
-            Instant m = ctx.clock().instant().minus(lookback.minusDays(1));
-            ZonedDateTime z = m.atZone(ctx.zone());
-            ZonedDateTime floor = z.toLocalDate().atStartOfDay(ctx.zone());
-            minDt = floor.equals(z) ? floor : z.toLocalDate().plusDays(1).atStartOfDay(ctx.zone());
+        @Nullable ZonedDateTime minDt = earliestFetchable(sub, ctx);
+        if (minDt != null) {
             for (int i = 0; i < n; i++) {
                 repairRow[i] &= !df.time(i).isBefore(minDt);
             }
@@ -115,8 +118,39 @@ final class Reconstruct {
         }
 
         Frame v2 = df.copy();
+        List<Integer> goodRows = goodRows(df);
+        List<TreeSet<Integer>> groups = groupBadBars(df, toRepair, sub);
+        if (!goodRows.isEmpty()) {
+            addCalibrationBars(df, groups, goodRows, minDt, subDaily);
+        }
+
+        BlockContext bc = new BlockContext(df, v2, interval, sub, startInterval, prepost, minDt, ctx);
+        LocalDate today = ctx.clock().instant().atZone(ctx.zone()).toLocalDate();
+        for (int gi = groups.size() - 1; gi >= 0; gi--) {
+            int[] block = groups.get(gi).stream().mapToInt(Integer::intValue).toArray();
+            reconstructBlock(bc, block, today);
+        }
+        return v2;
+    }
+
+    // ---- grouping the bad bars ----
+
+    /** The first instant finer data can be fetched for, or null when the sub-interval has no limit. */
+    private static @Nullable ZonedDateTime earliestFetchable(Interval sub, RepairContext ctx) {
+        Duration lookback = minLookback(sub);
+        if (lookback == null) {
+            return null;
+        }
+        Instant m = ctx.clock().instant().minus(lookback.minusDays(1));
+        ZonedDateTime z = m.atZone(ctx.zone());
+        ZonedDateTime floor = z.toLocalDate().atStartOfDay(ctx.zone());
+        return floor.equals(z) ? floor : z.toLocalDate().plusDays(1).atStartOfDay(ctx.zone());
+    }
+
+    /** Rows whose prices are all present and untagged. */
+    private static List<Integer> goodRows(Frame df) {
         List<Integer> goodRows = new ArrayList<>();
-        for (int i = 0; i < n; i++) {
+        for (int i = 0; i < df.size(); i++) {
             boolean good = true;
             for (Col c : PRICES) {
                 double v = df.get(c, i);
@@ -126,8 +160,11 @@ final class Reconstruct {
                 goodRows.add(i);
             }
         }
+        return goodRows;
+    }
 
-        // group nearby bad bars to reduce the number of fetches
+    /** Groups nearby bad bars to reduce the number of fetches. */
+    private static List<TreeSet<Integer>> groupBadBars(Frame df, int[] toRepair, Interval sub) {
         List<TreeSet<Integer>> groups = new ArrayList<>();
         TreeSet<Integer> current = new TreeSet<>();
         current.add(toRepair[0]);
@@ -143,239 +180,288 @@ final class Reconstruct {
                 groups.add(g);
             }
         }
+        return groups;
+    }
 
-        // add some good bars to each group for calibration
-        if (!goodRows.isEmpty()) {
-            for (TreeSet<Integer> g : groups) {
-                int g0 = g.first();
-                int gl = g.last();
-                int i0 = nearest(df, goodRows, df.time(g0).toInstant());
-                if (i0 > 0) {
-                    ZonedDateTime prev = df.time(goodRows.get(i0 - 1));
-                    if ((minDt == null || !prev.isBefore(minDt))
-                            && (!intraday
-                                    || prev.toLocalDate().equals(df.time(g0).toLocalDate()))) {
-                        i0--;
-                    }
+    /** Adds the good bars around each group (same day when sub-daily) for calibration. */
+    private static void addCalibrationBars(
+            Frame df,
+            List<TreeSet<Integer>> groups,
+            List<Integer> goodRows,
+            @Nullable ZonedDateTime minDt,
+            boolean subDaily) {
+        for (TreeSet<Integer> g : groups) {
+            int g0 = g.first();
+            int gl = g.last();
+            int i0 = nearest(df, goodRows, df.time(g0).toInstant());
+            if (i0 > 0) {
+                ZonedDateTime prev = df.time(goodRows.get(i0 - 1));
+                if ((minDt == null || !prev.isBefore(minDt))
+                        && (!subDaily || prev.toLocalDate().equals(df.time(g0).toLocalDate()))) {
+                    i0--;
                 }
-                int il = nearest(df, goodRows, df.time(gl).toInstant());
-                if (il < goodRows.size() - 1) {
-                    ZonedDateTime next = df.time(goodRows.get(il + 1));
-                    if (!intraday || next.toLocalDate().equals(df.time(gl).toLocalDate())) {
-                        il++;
-                    }
+            }
+            int il = nearest(df, goodRows, df.time(gl).toInstant());
+            if (il < goodRows.size() - 1) {
+                ZonedDateTime next = df.time(goodRows.get(il + 1));
+                if (!subDaily || next.toLocalDate().equals(df.time(gl).toLocalDate())) {
+                    il++;
                 }
-                for (int q = i0; q <= il; q++) {
-                    g.add(goodRows.get(q));
+            }
+            for (int q = i0; q <= il; q++) {
+                g.add(goodRows.get(q));
+            }
+        }
+    }
+
+    // ---- one block ----
+
+    /** What every block of one reconstruction shares. */
+    private record BlockContext(
+            Frame df,
+            Frame v2,
+            Interval interval,
+            Interval sub,
+            Interval startInterval,
+            boolean prepost,
+            @Nullable ZonedDateTime minDt,
+            RepairContext ctx) {}
+
+    /** Fetches, aggregates and calibrates finer data for one block of rows and repairs its tagged values. */
+    private static void reconstructBlock(BlockContext bc, int[] block, LocalDate today) {
+        Frame df = bc.df();
+        Interval interval = bc.interval();
+        Interval sub = bc.sub();
+        String symbol = bc.ctx().symbol();
+        ZonedDateTime startDt = df.time(block[0]);
+        ZonedDateTime endDt = df.time(block[block.length - 1]);
+        LocalDate startD = startDt.toLocalDate();
+        long age = ChronoUnit.DAYS.between(startD, today);
+        if ((sub == Interval.ONE_HOUR && age > MAX_HOURLY_AGE_DAYS)
+                || ((sub == Interval.THIRTY_MINUTES || sub == Interval.FIFTEEN_MINUTES) && age > MAX_MINUTE_AGE_DAYS)) {
+            LOG.info("{}: cannot reconstruct block starting {}, too old", symbol, startDt);
+            return;
+        }
+        Frame fine = fetchFiner(bc, startDt, endDt);
+        if (fine == null || fine.isEmpty()) {
+            LOG.info("{}: cannot reconstruct block starting {}, no finer-grained data", symbol, startDt);
+            return;
+        }
+        fine = trimToBlock(fine.inZone(bc.ctx().zone()).sortedAscending(), startDt, endDt, interval);
+        if (fine.isEmpty()) {
+            LOG.info("{}: Yahoo returned no finer-grained data within block {}", symbol, startDt);
+            return;
+        }
+
+        Agg agg = aggregate(fine, df, block, interval);
+        Frame fresh = agg.frame;
+        Map<Instant, Integer> freshPos = new LinkedHashMap<>();
+        for (int i = 0; i < fresh.size(); i++) {
+            freshPos.putIfAbsent(fresh.time(i).toInstant(), i);
+        }
+        if (!calibrate(df, block, agg, freshPos)) {
+            LOG.info("{}: cannot calibrate {} block starting {}, aborting repair", symbol, interval, startD);
+            return;
+        }
+        matchAdjustedClose(df, bc.v2(), block, fresh);
+        repairBlock(bc, block, fine, fresh, freshPos);
+    }
+
+    /** Fetches the finer data around the block, or null when the fetch failed. */
+    private static @Nullable Frame fetchFiner(BlockContext bc, ZonedDateTime startDt, ZonedDateTime endDt) {
+        Interval interval = bc.interval();
+        LocalDate startD = startDt.toLocalDate();
+        LocalDate fetchStart;
+        LocalDate fetchEnd;
+        if (interval == Interval.ONE_WEEK) {
+            fetchStart = startD.minusWeeks(1).minusDays(1);
+            fetchEnd = endDt.toLocalDate().plusWeeks(1).plusDays(1);
+        } else if (interval == Interval.ONE_DAY) {
+            fetchStart = startD.minusDays(1);
+            fetchEnd = endDt.toLocalDate().plusDays(1).plusDays(1);
+        } else {
+            fetchStart = startDt.minusDays(1).toLocalDate();
+            fetchEnd =
+                    Intervals.plus(endDt, interval, 1).plusDays(1).toLocalDate().plusDays(1);
+        }
+        ZonedDateTime minDt = bc.minDt();
+        if (minDt != null && minDt.toLocalDate().isAfter(fetchStart)) {
+            fetchStart = minDt.toLocalDate();
+        }
+        RepairContext ctx = bc.ctx();
+        try {
+            return ctx.finer().fetch(bc.sub(), fetchStart, fetchEnd, bc.prepost(), bc.startInterval());
+        } catch (YFRateLimitException e) {
+            throw e; // more requests would only be rate-limited too
+        } catch (RuntimeException e) {
+            if (isInterrupt(e)) {
+                throw e; // cancelled (e.g. a download): stop instead of returning unrepaired data
+            }
+            LOG.debug("{}: fetching {} data for reconstruction failed: {}", ctx.symbol(), bc.sub(), e.toString());
+            return null;
+        }
+    }
+
+    /** Discards the buffer around the block (yfinance pads by the coarse interval). */
+    private static Frame trimToBlock(Frame fine, ZonedDateTime startDt, ZonedDateTime endDt, Interval interval) {
+        Instant lo = startDt.toInstant();
+        Instant hi = Intervals.plus(endDt, interval, 1).toInstant().minusMillis(1);
+        List<Integer> keep = new ArrayList<>();
+        for (int i = 0; i < fine.size(); i++) {
+            Instant t = fine.time(i).toInstant();
+            if (!t.isBefore(lo) && !t.isAfter(hi)) {
+                keep.add(i);
+            }
+        }
+        return fine.rows(keep.stream().mapToInt(Integer::intValue).toArray());
+    }
+
+    /**
+     * Scales the aggregated prices to match the good values of the block (unit mix-ups, differing
+     * split adjustment); false when there is nothing to calibrate against.
+     */
+    private static boolean calibrate(Frame df, int[] block, Agg agg, Map<Instant, Integer> freshPos) {
+        Frame fresh = agg.frame;
+        List<double[]> ratioWeights = new ArrayList<>();
+        boolean anyCommon = false;
+        for (int bi : block) {
+            Integer fi = freshPos.get(df.time(bi).toInstant());
+            if (fi == null) {
+                continue;
+            }
+            anyCommon = true;
+            for (Col c : new Col[] {OPEN, CLOSE}) {
+                double b = df.get(c, bi);
+                double f = fresh.get(c, fi);
+                if (b != TAG && !Double.isNaN(f) && !Double.isNaN(b)) {
+                    ratioWeights.add(new double[] {b / f, agg.sizes[fi]});
                 }
             }
         }
+        if (!anyCommon || ratioWeights.isEmpty()) {
+            return false;
+        }
+        double[] ratios = ratioWeights.stream().mapToDouble(r -> r[0]).toArray();
+        double[] weights = ratioWeights.stream().mapToDouble(r -> r[1]).toArray();
+        if (ratios.length > 1) {
+            ratios = keepLargestCluster(ratios);
+        }
+        double ratio = Stats.weightedAverage(ratios, weights);
+        if (Math.abs(ratio - 1) < CALIBRATION_TOLERANCE) {
+            ratio = 1;
+        } else if (Math.abs(ratio / 100 - 1) < CALIBRATION_TOLERANCE) {
+            scalePrices(fresh, 100);
+            ratio = 1;
+        } else if (Math.abs(ratio / 0.01 - 1) < CALIBRATION_TOLERANCE) {
+            scalePrices(fresh, 0.01);
+            ratio = 1;
+        }
+        double ratioRcp = Stats.round(1.0 / ratio, 1);
+        ratio = Stats.round(ratio, 1);
+        if (!(ratio == 1 && ratioRcp == 1)) {
+            // finer data has a different split adjustment; match it to the coarse data
+            if (ratio > 1) {
+                scalePrices(fresh, ratio);
+                scaleVolume(fresh, 1.0 / ratio);
+            } else if (ratioRcp > 1) {
+                scalePrices(fresh, 1.0 / ratioRcp);
+                scaleVolume(fresh, ratioRcp);
+            }
+        }
+        return true;
+    }
 
-        LocalDate today = ctx.clock().instant().atZone(ctx.zone()).toLocalDate();
-        for (int gi = groups.size() - 1; gi >= 0; gi--) {
-            int[] block = groups.get(gi).stream().mapToInt(Integer::intValue).toArray();
-            ZonedDateTime startDt = df.time(block[0]);
-            ZonedDateTime endDt = df.time(block[block.length - 1]);
-            LocalDate startD = startDt.toLocalDate();
-            long age = ChronoUnit.DAYS.between(startD, today);
-            if ((sub == Interval.ONE_HOUR && age > 729)
-                    || ((sub == Interval.THIRTY_MINUTES || sub == Interval.FIFTEEN_MINUTES) && age > 59)) {
-                LOG.info("{}: cannot reconstruct block starting {}, too old", ctx.symbol(), startDt);
-                continue;
+    /** Scales the aggregated adjusted close to match the adjustment of the bar after the block. */
+    private static void matchAdjustedClose(Frame df, Frame v2, int[] block, Frame fresh) {
+        int last = fresh.size() - 1;
+        int postIdx = block[block.length - 1] + 1;
+        double postAdj;
+        if (postIdx >= v2.size()) {
+            double[] adj = new double[block.length];
+            for (int q = 0; q < block.length; q++) {
+                int bi = block[q];
+                adj[q] = isTagged(df, bi, PRICES) ? Double.NaN : df.get(ADJ_CLOSE, bi) / df.get(CLOSE, bi);
             }
-            LocalDate fetchStart;
-            LocalDate fetchEnd;
-            if (interval == Interval.ONE_WEEK) {
-                fetchStart = startD.minusWeeks(1).minusDays(1);
-                fetchEnd = endDt.toLocalDate().plusWeeks(1).plusDays(1);
-            } else if (interval == Interval.ONE_DAY) {
-                fetchStart = startD.minusDays(1);
-                fetchEnd = endDt.toLocalDate().plusDays(1).plusDays(1);
-            } else {
-                fetchStart = startDt.minusDays(1).toLocalDate();
-                fetchEnd = Intervals.plus(endDt, interval, 1)
-                        .plusDays(1)
-                        .toLocalDate()
-                        .plusDays(1);
+            postAdj = lastAfterFill(adj);
+            if (Double.isNaN(postAdj)) {
+                postAdj = 1.0;
             }
-            if (minDt != null && minDt.toLocalDate().isAfter(fetchStart)) {
-                fetchStart = minDt.toLocalDate();
-            }
-            Frame fine;
-            try {
-                fine = ctx.finer().fetch(sub, fetchStart, fetchEnd, prepost, startInterval);
-            } catch (YFRateLimitException e) {
-                throw e; // more requests would only be rate-limited too
-            } catch (RuntimeException e) {
-                if (isInterrupt(e)) {
-                    throw e; // cancelled (e.g. a download): stop instead of returning unrepaired data
-                }
-                LOG.debug("{}: fetching {} data for reconstruction failed: {}", ctx.symbol(), sub, e.toString());
-                fine = null;
-            }
-            if (fine == null || fine.isEmpty()) {
-                LOG.info("{}: cannot reconstruct block starting {}, no finer-grained data", ctx.symbol(), startDt);
-                continue;
-            }
-            fine = fine.inZone(ctx.zone()).sortedAscending();
-            // discard the buffer (yfinance pads by the coarse interval)
-            Instant lo = startDt.toInstant();
-            Instant hi = Intervals.plus(endDt, interval, 1).toInstant().minusMillis(1);
-            List<Integer> keep = new ArrayList<>();
-            for (int i = 0; i < fine.size(); i++) {
-                Instant t = fine.time(i).toInstant();
-                if (!t.isBefore(lo) && !t.isAfter(hi)) {
-                    keep.add(i);
-                }
-            }
-            if (keep.isEmpty()) {
-                LOG.info("{}: Yahoo returned no finer-grained data within block {}", ctx.symbol(), startDt);
-                continue;
-            }
-            fine = fine.rows(keep.stream().mapToInt(Integer::intValue).toArray());
-
-            Agg agg = aggregate(fine, df, block, interval);
-            Frame fresh = agg.frame;
-
-            // calibrate against the good values of the block
-            Map<Instant, Integer> freshPos = new LinkedHashMap<>();
+        } else {
+            postAdj = v2.get(ADJ_CLOSE, postIdx) / v2.get(CLOSE, postIdx);
+        }
+        double freshAdjLast = fresh.get(ADJ_CLOSE, last) / fresh.get(CLOSE, last);
+        if (Double.isNaN(freshAdjLast) && last >= 1) {
+            freshAdjLast = fresh.get(ADJ_CLOSE, last - 1) / fresh.get(CLOSE, last - 1);
+        }
+        if (postIdx < v2.size() && v2.get(DIVIDENDS, postIdx) != 0) {
+            postAdj *= 1 - v2.get(DIVIDENDS, postIdx) / fresh.get(CLOSE, last);
+        }
+        double adjCorrection = postAdj / freshAdjLast;
+        if (adjCorrection != 1) {
             for (int i = 0; i < fresh.size(); i++) {
-                freshPos.putIfAbsent(fresh.time(i).toInstant(), i);
-            }
-            List<double[]> ratioWeights = new ArrayList<>();
-            boolean anyCommon = false;
-            for (int bi : block) {
-                Integer fi = freshPos.get(df.time(bi).toInstant());
-                if (fi == null) {
-                    continue;
-                }
-                anyCommon = true;
-                for (Col c : new Col[] {OPEN, CLOSE}) {
-                    double b = df.get(c, bi);
-                    double f = fresh.get(c, fi);
-                    if (b != TAG && !Double.isNaN(f) && !Double.isNaN(b)) {
-                        ratioWeights.add(new double[] {b / f, agg.sizes[fi]});
-                    }
-                }
-            }
-            if (!anyCommon || ratioWeights.isEmpty()) {
-                LOG.info("{}: cannot calibrate {} block starting {}, aborting repair", ctx.symbol(), interval, startD);
-                continue;
-            }
-            double[] ratios = ratioWeights.stream().mapToDouble(r -> r[0]).toArray();
-            double[] weights = ratioWeights.stream().mapToDouble(r -> r[1]).toArray();
-            if (ratios.length > 1) {
-                ratios = keepLargestCluster(ratios);
-            }
-            double ratio = Stats.weightedAverage(ratios, weights);
-            if (Math.abs(ratio - 1) < 0.1) {
-                ratio = 1;
-            } else if (Math.abs(ratio / 100 - 1) < 0.1) {
-                scalePrices(fresh, 100);
-                ratio = 1;
-            } else if (Math.abs(ratio / 0.01 - 1) < 0.1) {
-                scalePrices(fresh, 0.01);
-                ratio = 1;
-            }
-            double ratioRcp = Stats.round(1.0 / ratio, 1);
-            ratio = Stats.round(ratio, 1);
-            if (!(ratio == 1 && ratioRcp == 1)) {
-                // finer data has a different split adjustment; match it to the coarse data
-                if (ratio > 1) {
-                    scalePrices(fresh, ratio);
-                    scaleVolume(fresh, 1.0 / ratio);
-                } else if (ratioRcp > 1) {
-                    scalePrices(fresh, 1.0 / ratioRcp);
-                    scaleVolume(fresh, ratioRcp);
-                }
-            }
-
-            // match the adjusted close to the bar after the block
-            int last = fresh.size() - 1;
-            int postIdx = block[block.length - 1] + 1;
-            double postAdj;
-            if (postIdx >= v2.size()) {
-                double[] adj = new double[block.length];
-                for (int q = 0; q < block.length; q++) {
-                    int bi = block[q];
-                    boolean tagged = false;
-                    for (Col c : PRICES) {
-                        tagged |= df.get(c, bi) == TAG;
-                    }
-                    adj[q] = tagged ? Double.NaN : df.get(ADJ_CLOSE, bi) / df.get(CLOSE, bi);
-                }
-                postAdj = lastAfterFill(adj);
-                if (Double.isNaN(postAdj)) {
-                    postAdj = 1.0;
-                }
-            } else {
-                postAdj = v2.get(ADJ_CLOSE, postIdx) / v2.get(CLOSE, postIdx);
-            }
-            double freshAdjLast = fresh.get(ADJ_CLOSE, last) / fresh.get(CLOSE, last);
-            if (Double.isNaN(freshAdjLast) && last >= 1) {
-                freshAdjLast = fresh.get(ADJ_CLOSE, last - 1) / fresh.get(CLOSE, last - 1);
-            }
-            if (postIdx < v2.size() && v2.get(DIVIDENDS, postIdx) != 0) {
-                postAdj *= 1 - v2.get(DIVIDENDS, postIdx) / fresh.get(CLOSE, last);
-            }
-            double adjCorrection = postAdj / freshAdjLast;
-            if (adjCorrection != 1) {
-                for (int i = 0; i < fresh.size(); i++) {
-                    fresh.set(ADJ_CLOSE, i, fresh.get(ADJ_CLOSE, i) * adjCorrection);
-                }
-            }
-
-            // repair
-            Frame fineLeft = fine;
-            for (int bi : block) {
-                boolean bad = false;
-                for (Col c : DATA) {
-                    bad |= df.get(c, bi) == TAG;
-                }
-                if (!bad) {
-                    continue;
-                }
-                Instant dt = df.time(bi).toInstant();
-                Integer fi = freshPos.get(dt);
-                if (fi == null) {
-                    continue; // no finer data, so probably no trading
-                }
-                int prevWeek = Math.floorMod(fi - 1, fresh.size());
-                if (interval == Interval.ONE_WEEK) {
-                    fineLeft = fromTime(fineLeft, dt);
-                }
-                if (df.get(HIGH, bi) == TAG) {
-                    v2.set(HIGH, bi, fresh.get(HIGH, fi));
-                }
-                if (df.get(LOW, bi) == TAG) {
-                    v2.set(LOW, bi, fresh.get(LOW, fi));
-                }
-                if (df.get(OPEN, bi) == TAG) {
-                    if (interval == Interval.ONE_WEEK
-                            && !fineLeft.isEmpty()
-                            && !fineLeft.time(0).toInstant().equals(dt)) {
-                        // exchange closed on Monday: Yahoo sets the open to last week's close
-                        double open = fresh.get(CLOSE, prevWeek);
-                        v2.set(OPEN, bi, open);
-                        double low = v2.get(LOW, bi);
-                        v2.set(LOW, bi, low < open ? low : open);
-                    } else {
-                        v2.set(OPEN, bi, fresh.get(OPEN, fi));
-                    }
-                }
-                if (df.get(CLOSE, bi) == TAG) {
-                    v2.set(CLOSE, bi, fresh.get(CLOSE, fi));
-                    v2.set(ADJ_CLOSE, bi, fresh.get(ADJ_CLOSE, fi));
-                } else if (df.get(ADJ_CLOSE, bi) == TAG) {
-                    v2.set(ADJ_CLOSE, bi, fresh.get(ADJ_CLOSE, fi));
-                }
-                if (df.get(VOLUME, bi) == TAG) {
-                    v2.set(VOLUME, bi, Math.rint(fresh.get(VOLUME, fi)));
-                }
-                v2.repaired()[bi] = true;
+                fresh.set(ADJ_CLOSE, i, fresh.get(ADJ_CLOSE, i) * adjCorrection);
             }
         }
-        return v2;
+    }
+
+    /** Replaces the tagged values of the block with the aggregated ones. */
+    private static void repairBlock(
+            BlockContext bc, int[] block, Frame fine, Frame fresh, Map<Instant, Integer> freshPos) {
+        Frame df = bc.df();
+        Frame v2 = bc.v2();
+        boolean weekly = bc.interval() == Interval.ONE_WEEK;
+        Frame fineLeft = fine;
+        for (int bi : block) {
+            if (!isTagged(df, bi, DATA)) {
+                continue;
+            }
+            Instant dt = df.time(bi).toInstant();
+            Integer fi = freshPos.get(dt);
+            if (fi == null) {
+                continue; // no finer data, so probably no trading
+            }
+            int prevWeek = Math.floorMod(fi - 1, fresh.size());
+            if (weekly) {
+                fineLeft = fromTime(fineLeft, dt);
+            }
+            if (df.get(HIGH, bi) == TAG) {
+                v2.set(HIGH, bi, fresh.get(HIGH, fi));
+            }
+            if (df.get(LOW, bi) == TAG) {
+                v2.set(LOW, bi, fresh.get(LOW, fi));
+            }
+            if (df.get(OPEN, bi) == TAG) {
+                if (weekly
+                        && !fineLeft.isEmpty()
+                        && !fineLeft.time(0).toInstant().equals(dt)) {
+                    // exchange closed on Monday: Yahoo sets the open to last week's close
+                    double open = fresh.get(CLOSE, prevWeek);
+                    v2.set(OPEN, bi, open);
+                    double low = v2.get(LOW, bi);
+                    v2.set(LOW, bi, low < open ? low : open);
+                } else {
+                    v2.set(OPEN, bi, fresh.get(OPEN, fi));
+                }
+            }
+            if (df.get(CLOSE, bi) == TAG) {
+                v2.set(CLOSE, bi, fresh.get(CLOSE, fi));
+                v2.set(ADJ_CLOSE, bi, fresh.get(ADJ_CLOSE, fi));
+            } else if (df.get(ADJ_CLOSE, bi) == TAG) {
+                v2.set(ADJ_CLOSE, bi, fresh.get(ADJ_CLOSE, fi));
+            }
+            if (df.get(VOLUME, bi) == TAG) {
+                v2.set(VOLUME, bi, Math.rint(fresh.get(VOLUME, fi)));
+            }
+            v2.repaired()[bi] = true;
+        }
+    }
+
+    private static boolean isTagged(Frame df, int row, Col[] cols) {
+        boolean tagged = false;
+        for (Col c : cols) {
+            tagged |= df.get(c, row) == TAG;
+        }
+        return tagged;
     }
 
     // ---- aggregation of the finer data ----
@@ -397,7 +483,7 @@ final class Reconstruct {
                 keys[i] = fine.time(i).toLocalDate();
             }
         } else {
-            java.util.Set<Instant> blockTimes = new java.util.HashSet<>();
+            Set<Instant> blockTimes = new HashSet<>();
             for (int bi : block) {
                 blockTimes.add(df.time(bi).toInstant());
             }
@@ -494,7 +580,7 @@ final class Reconstruct {
             }
         }
         final int keep = largest;
-        double[] in = java.util.stream.IntStream.range(0, ratios.length)
+        double[] in = IntStream.range(0, ratios.length)
                 .filter(i -> labels[i] == keep)
                 .mapToDouble(i -> ratios[i])
                 .toArray();

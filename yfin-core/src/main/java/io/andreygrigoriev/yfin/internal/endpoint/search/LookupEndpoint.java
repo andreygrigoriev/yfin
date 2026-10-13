@@ -79,10 +79,10 @@ public final class LookupEndpoint {
                     text(d.path("shortName")),
                     text(d.path("quoteType")),
                     text(d.path("exchange")),
-                    Plain.number(d.path("regularMarketPrice")),
-                    Plain.number(d.path("regularMarketChange")),
-                    Plain.number(d.path("regularMarketPercentChange")),
-                    Plain.integral(d.path("rank")),
+                    YahooJson.number(d.path("regularMarketPrice")),
+                    YahooJson.number(d.path("regularMarketChange")),
+                    YahooJson.number(d.path("regularMarketPercentChange")),
+                    YahooJson.integral(d.path("rank")),
                     plainMap(d)));
         }
         return List.copyOf(out);

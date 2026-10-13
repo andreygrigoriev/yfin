@@ -16,9 +16,11 @@ import io.andreygrigoriev.yfin.spi.Cache;
 import io.andreygrigoriev.yfin.spi.HttpRequest;
 import io.andreygrigoriev.yfin.testing.FakeTransport;
 import java.nio.file.Path;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Map;
@@ -100,7 +102,7 @@ class SharesEndpointTest {
         YahooSession session = sessionOf();
         Instant now = ZonedDateTime.of(2026, 10, 12, 15, 30, 0, 0, NY).toInstant();
 
-        new SharesEndpoint(session, s -> NY, () -> now).sharesFull("AAPL", null, null);
+        new SharesEndpoint(session, s -> NY, Clock.fixed(now, ZoneOffset.UTC)).sharesFull("AAPL", null, null);
 
         Map<String, List<String>> q =
                 FakeTransport.parseQuery(fake.requests().getLast().uri().getRawQuery());

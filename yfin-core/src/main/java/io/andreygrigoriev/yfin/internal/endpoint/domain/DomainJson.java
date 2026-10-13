@@ -98,12 +98,14 @@ final class DomainJson {
 
     /** A plain number, or the {@code raw} member of Yahoo's {@code {"raw":…,"fmt":…}} form. */
     static @Nullable Double number(JsonNode node) {
-        JsonNode n = node.isObject() ? node.path("raw") : node;
-        return n.isNumber() ? n.doubleValue() : null;
+        return YahooJson.number(unwrapRaw(node));
     }
 
     static @Nullable Long integral(JsonNode node) {
-        JsonNode n = node.isObject() ? node.path("raw") : node;
-        return n.isNumber() && n.canConvertToLong() ? n.longValue() : null;
+        return YahooJson.integral(unwrapRaw(node));
+    }
+
+    private static JsonNode unwrapRaw(JsonNode node) {
+        return node.isObject() ? node.path("raw") : node;
     }
 }

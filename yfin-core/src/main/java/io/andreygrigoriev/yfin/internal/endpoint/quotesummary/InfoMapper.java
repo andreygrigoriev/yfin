@@ -3,6 +3,7 @@ package io.andreygrigoriev.yfin.internal.endpoint.quotesummary;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.LongNode;
 import com.fasterxml.jackson.databind.node.TextNode;
+import io.andreygrigoriev.yfin.internal.endpoint.timeseries.TimeseriesEndpoint;
 import io.andreygrigoriev.yfin.internal.http.YahooJson;
 import io.andreygrigoriev.yfin.model.TickerInfo;
 import java.util.Collections;
@@ -81,7 +82,7 @@ public final class InfoMapper {
             }
         });
         if (trailingPegRatio != null) {
-            raw.put("trailingPegRatio", trailingPegRatio);
+            raw.put(TimeseriesEndpoint.TRAILING_PEG_RATIO, trailingPegRatio);
         }
         return new TickerInfo(symbol, raw);
     }

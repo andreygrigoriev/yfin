@@ -1,6 +1,7 @@
 package io.andreygrigoriev.yfin.internal.endpoint.quotesummary;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import io.andreygrigoriev.yfin.internal.http.YahooJson;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -42,13 +43,11 @@ final class ModuleNodes {
     }
 
     static @Nullable Double dbl(JsonNode node, String field) {
-        JsonNode v = node.path(field);
-        return v.isNumber() ? v.doubleValue() : null;
+        return YahooJson.number(node.path(field));
     }
 
     static @Nullable Long lng(JsonNode node, String field) {
-        JsonNode v = node.path(field);
-        return v.isNumber() && v.canConvertToLong() ? v.longValue() : null;
+        return YahooJson.integral(node.path(field));
     }
 
     static @Nullable Boolean bool(JsonNode node, String field) {
@@ -68,9 +67,8 @@ final class ModuleNodes {
 
     /** An epoch-seconds number as a UTC date, or {@code null} for any other node. */
     static @Nullable LocalDate toDate(JsonNode v) {
-        return v.isNumber() && v.canConvertToLong()
-                ? LocalDate.ofInstant(Instant.ofEpochSecond(v.longValue()), ZoneOffset.UTC)
-                : null;
+        Long seconds = YahooJson.integral(v);
+        return seconds == null ? null : LocalDate.ofInstant(Instant.ofEpochSecond(seconds), ZoneOffset.UTC);
     }
 
     /** An ISO {@code yyyy-MM-dd} string field as a date, or {@code null}. */

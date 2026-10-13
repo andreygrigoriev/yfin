@@ -151,7 +151,7 @@ final class ChartMapper {
     // ---- metadata ----
 
     static HistoryMetadata metadata(JsonNode meta, String requestedSymbol) {
-        String zoneName = text(meta, "exchangeTimezoneName");
+        String zoneName = YahooJson.text(meta.path("exchangeTimezoneName"));
         if (zoneName == null) {
             throw new YFDataException("chart meta has no exchangeTimezoneName", meta.toString());
         }
@@ -167,55 +167,38 @@ final class ChartMapper {
                 validRanges.add(r.asText());
             }
         }
-        String symbol = text(meta, "symbol");
-        Long gmtOffset = longValue(meta, "gmtoffset");
-        Long priceHint = longValue(meta, "priceHint");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> raw = (Map<String, Object>) YahooJson.toPlain(meta);
+        String symbol = YahooJson.text(meta.path("symbol"));
+        Long gmtOffset = YahooJson.integral(meta.path("gmtoffset"));
+        Long priceHint = YahooJson.integral(meta.path("priceHint"));
         return new HistoryMetadata(
                 symbol == null ? requestedSymbol : symbol,
-                text(meta, "currency"),
-                text(meta, "exchangeName"),
-                text(meta, "fullExchangeName"),
-                text(meta, "instrumentType"),
+                YahooJson.text(meta.path("currency")),
+                YahooJson.text(meta.path("exchangeName")),
+                YahooJson.text(meta.path("fullExchangeName")),
+                YahooJson.text(meta.path("instrumentType")),
                 zone,
-                text(meta, "timezone"),
+                YahooJson.text(meta.path("timezone")),
                 gmtOffset,
                 time(meta, "firstTradeDate", zone),
                 time(meta, "regularMarketTime", zone),
-                doubleValue(meta, "regularMarketPrice"),
-                doubleValue(meta, "regularMarketDayHigh"),
-                doubleValue(meta, "regularMarketDayLow"),
-                longValue(meta, "regularMarketVolume"),
-                doubleValue(meta, "previousClose"),
-                doubleValue(meta, "chartPreviousClose"),
-                doubleValue(meta, "fiftyTwoWeekHigh"),
-                doubleValue(meta, "fiftyTwoWeekLow"),
-                text(meta, "longName"),
-                text(meta, "shortName"),
+                YahooJson.number(meta.path("regularMarketPrice")),
+                YahooJson.number(meta.path("regularMarketDayHigh")),
+                YahooJson.number(meta.path("regularMarketDayLow")),
+                YahooJson.integral(meta.path("regularMarketVolume")),
+                YahooJson.number(meta.path("previousClose")),
+                YahooJson.number(meta.path("chartPreviousClose")),
+                YahooJson.number(meta.path("fiftyTwoWeekHigh")),
+                YahooJson.number(meta.path("fiftyTwoWeekLow")),
+                YahooJson.text(meta.path("longName")),
+                YahooJson.text(meta.path("shortName")),
                 priceHint == null ? null : priceHint.intValue(),
                 meta.path("hasPrePostMarketData").isBoolean()
                         ? meta.path("hasPrePostMarketData").booleanValue()
                         : null,
-                text(meta, "dataGranularity"),
-                text(meta, "range"),
+                YahooJson.text(meta.path("dataGranularity")),
+                YahooJson.text(meta.path("range")),
                 validRanges,
-                raw == null ? Map.of() : raw);
-    }
-
-    private static @Nullable String text(JsonNode node, String field) {
-        JsonNode v = node.path(field);
-        return v.isTextual() && !v.asText().isEmpty() ? v.asText() : null;
-    }
-
-    private static @Nullable Double doubleValue(JsonNode node, String field) {
-        JsonNode v = node.path(field);
-        return v.isNumber() ? v.asDouble() : null;
-    }
-
-    private static @Nullable Long longValue(JsonNode node, String field) {
-        JsonNode v = node.path(field);
-        return v.isNumber() ? v.asLong() : null;
+                YahooJson.plainMap(meta));
     }
 
     private static @Nullable ZonedDateTime time(JsonNode node, String field, ZoneId zone) {

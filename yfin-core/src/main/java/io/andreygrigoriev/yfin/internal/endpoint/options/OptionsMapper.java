@@ -40,7 +40,6 @@ final class OptionsMapper {
     }
 
     /** The chain in {@code result}, or empty when it has none (a symbol without options). */
-    @SuppressWarnings("unchecked")
     static Optional<OptionChain> chain(String symbol, JsonNode result) {
         JsonNode options = result.path("options").path(0);
         JsonNode expiration = options.path("expirationDate");
@@ -49,13 +48,12 @@ final class OptionsMapper {
         }
         JsonNode quote = result.path("quote");
         ZoneId zone = zone(quote);
-        Object underlying = YahooJson.toPlain(quote);
         return Optional.of(new OptionChain(
                 symbol,
                 date(expiration.longValue()),
                 contracts(options.path("calls"), zone),
                 contracts(options.path("puts"), zone),
-                underlying instanceof Map<?, ?> map ? (Map<String, Object>) map : Map.of()));
+                YahooJson.plainMap(quote)));
     }
 
     private static List<OptionContract> contracts(JsonNode nodes, ZoneId zone) {
