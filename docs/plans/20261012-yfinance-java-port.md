@@ -641,10 +641,10 @@ YFinanceException (RuntimeException)
   - `get_valuation_measures(freq="monthly")`: no `Frequency.MONTHLY` (statements have no monthly series); `periods` cap not ported — all periods kept
 
 ### Task 29: [Final] Update documentation
-- [ ] `README.md`: install (Maven/Gradle coordinates per module), quickstart, examples per area, yfinance → yfin API mapping/parity table, rate-limit guidance, logging setup, GraalVM native-image notes (supported modules, any required flags), Yahoo ToS disclaimer (not affiliated; personal/research use)
-- [ ] `CONTRIBUTING.md`: fixture recording workflow, live suite, formatting
-- [ ] create `CLAUDE.md` with build commands and project conventions discovered during implementation
-- [ ] move this plan to `docs/plans/completed/`
+- [x] `README.md`: install (Maven/Gradle coordinates per module), quickstart, examples per area, yfinance → yfin API mapping/parity table, rate-limit guidance, logging setup, GraalVM native-image notes (supported modules, any required flags), Yahoo ToS disclaimer (not affiliated; personal/research use)
+- [x] `CONTRIBUTING.md`: fixture recording workflow, live suite, formatting
+- [x] create `CLAUDE.md` with build commands and project conventions discovered during implementation
+- [x] move this plan to `docs/plans/completed/` (left in place - the plan harness moves it after all phases)
 
 ## Post-Completion
 *Items requiring manual intervention or external systems - no checkboxes, informational only*
