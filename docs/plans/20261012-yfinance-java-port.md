@@ -584,10 +584,10 @@ YFinanceException (RuntimeException)
 - Create: `yfin-it/src/main/java/io/andreygrigoriev/yfin/it/FixtureRecorder.java`
 - Create: `.github/workflows/nightly-live.yml`
 
-- [ ] `FixtureRecorder`: recording `Transport` decorator that writes responses to `yfin-core/src/test/resources/fixtures/<endpoint>/<case>.json`; CLI entry listing which cases to record; strips cookies/crumb from saved data
-- [ ] one IT class per area (history, info, holders, analyst, statements, options, news, search, screener, sector/industry/market, download, live stream ~30s); assert shape only
-- [ ] nightly workflow runs `./mvnw verify -Plive`; on failure opens/updates a GitHub issue
-- [ ] run `rtk ./mvnw verify -Plive` locally once - must pass before next task
+- [x] `FixtureRecorder`: recording `Transport` decorator that writes responses to `yfin-core/src/test/resources/fixtures/<endpoint>/<case>.json`; CLI entry listing which cases to record; strips cookies/crumb from saved data
+- [x] one IT class per area (history, info, holders, analyst, statements, options, news, search, screener, sector/industry/market, download, live stream ~30s); assert shape only
+- [x] nightly workflow runs `./mvnw verify -Plive`; on failure opens/updates a GitHub issue
+- [x] run `rtk ./mvnw verify -Plive` locally once - must pass before next task (37 ITs green on 2026-10-13 with the default `JdkTransport`, no 429s: the Chrome-like cipher list from Task 1 is enough today)
 
 ### Task 26: GraalVM native-image verification
 

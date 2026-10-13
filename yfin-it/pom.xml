@@ -19,7 +19,19 @@
         <skipPublishing>true</skipPublishing>
         <maven.javadoc.skip>true</maven.javadoc.skip>
         <maven.source.skip>true</maven.source.skip>
+        <exec.mainClass>io.andreygrigoriev.yfin.it.FixtureRecorder</exec.mainClass>
     </properties>
+
+    <build>
+        <plugins>
+            <!-- record fixtures: ./mvnw -pl yfin-it -am install -DskipTests,
+                 then ./mvnw -pl yfin-it exec:java (lists cases) or exec:java -Dexec.args="chart/aapl-1d-1mo" -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
 
     <profiles>
         <!-- live integration tests against Yahoo Finance: ./mvnw verify -Plive -->
@@ -54,8 +66,19 @@
             <artifactId>yfin-live</artifactId>
         </dependency>
         <dependency>
+            <groupId>org.jspecify</groupId>
+            <artifactId>jspecify</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-simple</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.andreygrigoriev</groupId>
+            <artifactId>yfin-core</artifactId>
+            <type>test-jar</type>
             <scope>test</scope>
         </dependency>
         <dependency>
