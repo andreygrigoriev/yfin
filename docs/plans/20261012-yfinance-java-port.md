@@ -554,12 +554,15 @@ YFinanceException (RuntimeException)
 - Create: `yfin-tablesaw/src/main/java/module-info.java`
 - Create: `yfin-tablesaw/src/main/java/io/andreygrigoriev/yfin/tablesaw/TablesawAdapter.java`
 - Create: `yfin-tablesaw/src/test/java/io/andreygrigoriev/yfin/tablesaw/TablesawAdapterTest.java`
+- ➕ Modify: `yfin-tablesaw/pom.xml` (optional jspecify, like core/live)
+- ⚠️ Decision: Tablesaw has no zoned column, so timestamps are `DateTimeColumn`s of exchange-local `LocalDateTime`; time column is `Date` for daily+ and `Datetime` for intraday (yfinance index naming); `Repaired?` column added only when a bar was repaired; event columns only when the history has such events, 0 on non-event bars; events go to the containing bar (intraday: first bar of the event date; otherwise last bar starting at/before the event within its nominal duration), others dropped
+- ⚠️ Decision: statement table's first column `Line Item` holds the Yahoo key; period columns named by ISO date. List-shaped results use distinct names (`holdersToTable`, `optionsToTable`, `earningsDatesToTable`) because `toTable(List<…>)` overloads clash on erasure. Tablesaw 0.44.4 has no module descriptor: required as automatic module `tablesaw.core`
 
-- [ ] `toTable(PriceHistory)`: columns Date, Open, High, Low, Close, Adj Close, Volume (+ Dividends, Stock Splits, Capital Gains when present), yfinance naming
-- [ ] `toTable(FinancialStatement)`: rows = line items, columns = periods
-- [ ] `toTable` for other list-shaped results where useful (holders, option chain, earnings dates)
-- [ ] write tests: column names/types/order, NaN preserved, empty input → empty table
-- [ ] run `rtk ./mvnw verify` - must pass before next task
+- [x] `toTable(PriceHistory)`: columns Date, Open, High, Low, Close, Adj Close, Volume (+ Dividends, Stock Splits, Capital Gains when present), yfinance naming
+- [x] `toTable(FinancialStatement)`: rows = line items, columns = periods
+- [x] `toTable` for other list-shaped results where useful (holders, option chain, earnings dates)
+- [x] write tests: column names/types/order, NaN preserved, empty input → empty table
+- [x] run `rtk ./mvnw verify` - must pass before next task
 
 ### Task 24: DFLib adapter
 
