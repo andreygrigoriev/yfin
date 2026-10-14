@@ -253,13 +253,13 @@
 - Create: `yfin-core/src/main/java/io/andreygrigoriev/yfin/internal/endpoint/calendar/package-info.java`
 - Create: `yfin-core/src/test/java/io/andreygrigoriev/yfin/internal/endpoint/calendar/CalendarEndpointTest.java`
 
-- [ ] constants per type: `entityIdType`, `sortField`, `includeFields` copied from yfinance `PREDEFINED_CALENDARS`
-- [ ] `ipos(CalendarRequest)`: `OR[GTELT startdatetime, GTELT filingdate, GTELT amendeddate]`; maps rows to `IpoEvent` (zero → NaN for prices/shares)
-- [ ] `economicEvents(CalendarRequest)` and `splits(CalendarRequest)`: `AND[GTE, LTE startdatetime]`; map to `EconomicEvent` (zero → NaN for the four values) and `SplitEvent`
-- [ ] write body tests for each type: compare the parsed JSON tree with the expected yfinance body (`sortType`, `entityIdType`, `sortField`, `includeFields`, `size`, `offset`, `query`), and check the URL params `lang`/`region`
-- [ ] write parse tests per type against the normal fixtures (row count, first row fully asserted, NaN placeholders), the empty fixtures (`List.of()`), and the error fixture (`YFDataException`)
-- [ ] write edge tests: a row missing its key column is skipped; a synthetic fixture with reordered columns still maps by id (`*-synthetic.json`, explained in the test)
-- [ ] run `./mvnw verify` - must pass before task 5
+- [x] constants per type: `entityIdType`, `sortField`, `includeFields` copied from yfinance `PREDEFINED_CALENDARS`
+- [x] `ipos(CalendarRequest)`: `OR[GTELT startdatetime, GTELT filingdate, GTELT amendeddate]`; maps rows to `IpoEvent` (zero → NaN for prices/shares)
+- [x] `economicEvents(CalendarRequest)` and `splits(CalendarRequest)`: `AND[GTE, LTE startdatetime]`; map to `EconomicEvent` (zero → NaN for the four values) and `SplitEvent`
+- [x] write body tests for each type: compare the parsed JSON tree with the expected yfinance body (`sortType`, `entityIdType`, `sortField`, `includeFields`, `size`, `offset`, `query`), and check the URL params `lang`/`region`
+- [x] write parse tests per type against the normal fixtures (row count, first row fully asserted, NaN placeholders), the empty fixtures (`List.of()`), and the error fixture (`YFDataException`)
+- [x] write edge tests: a row missing its key column is skipped; a synthetic fixture with reordered columns still maps by id (`*-synthetic.json`, explained in the test)
+- [x] run `./mvnw verify` - must pass before task 5
 
 ### Task 5: Implement the earnings calendar with the most-active filter
 
