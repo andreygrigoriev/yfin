@@ -109,6 +109,20 @@ class EarningsDatesEndpointTest {
     }
 
     @Test
+    void bodyWireFormatIsStable() {
+        assertThat(EarningsDatesEndpoint.body("AAPL", 25).toString())
+                .isEqualTo("{\"sortType\":\"DESC\",\"entityIdType\":\"sp_earnings\",\"sortField\":\"startdatetime\","
+                        + "\"includeFields\":[\"ticker\",\"companyshortname\",\"eventname\",\"startdatetime\","
+                        + "\"startdatetimetype\",\"dateisestimate\",\"epsestimate\",\"epsactual\",\"epssurprisepct\","
+                        + "\"timeZoneShortName\",\"gmtOffsetMilliSeconds\"],"
+                        + "\"query\":{\"operator\":\"and\",\"operands\":["
+                        + "{\"operator\":\"eq\",\"operands\":[\"ticker\",\"AAPL\"]},"
+                        + "{\"operator\":\"or\",\"operands\":[{\"operator\":\"eq\",\"operands\":[\"eventtype\",\"EAD\"]},"
+                        + "{\"operator\":\"eq\",\"operands\":[\"eventtype\",\"ERA\"]}]}]},"
+                        + "\"offset\":0,\"size\":25}");
+    }
+
+    @Test
     void missingEstimatesAreNaN() {
         fake.onPost(PATH).respondFixture("earnings/cba-ax.json");
         cache.put("tz", "CBA.AX", "Australia/Sydney");

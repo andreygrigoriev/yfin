@@ -219,13 +219,13 @@
 - Create: `yfin-core/src/test/java/io/andreygrigoriev/yfin/internal/endpoint/visualization/VisualizationTableTest.java`
 - Create: `yfin-core/src/test/java/io/andreygrigoriev/yfin/internal/endpoint/visualization/VisualizationQueryTest.java`
 
-- [ ] `VisualizationQuery`: `and(...)`, `or(...)`, `eq(field, value)`, `gte`, `lte`, `gtelt(field, from, to)` building `ObjectNode`s, with the operator case as a parameter. Earnings dates keep lower case (current wire format, unchanged); calendars use upper case like yfinance
-- [ ] `VisualizationEndpoint.post(ObjectNode body, String context)`: adds `lang=en-US&region=US`, does a `postJson`, then `YahooJson.read`
-- [ ] `VisualizationTable.of(JsonNode root)`: result/document checks (`YFDataException` on a missing result list or non-array rows, empty on no rows), `columnIndex(id)`, `rows()`, cell readers `text`, `number`, `zeroAsNaN`, `instant`, `localDate`, `bool`
-- [ ] refactor `EarningsDatesEndpoint` onto the three helpers with no behavior change (`body()` output byte-identical)
-- [ ] write `VisualizationQueryTest` (nesting, operator case) and `VisualizationTableTest` (column lookup by id, duplicate ids keep the first, missing/null/empty-string cells, zero-as-NaN, bad date gives `YFDataException`)
-- [ ] existing `EarningsDatesEndpointTest` passes unchanged
-- [ ] run `./mvnw verify` - must pass before task 3
+- [x] `VisualizationQuery`: `and(...)`, `or(...)`, `eq(field, value)`, `gte`, `lte`, `gtelt(field, from, to)` building `ObjectNode`s, with the operator case as a parameter. Earnings dates keep lower case (current wire format, unchanged); calendars use upper case like yfinance
+- [x] `VisualizationEndpoint.post(ObjectNode body, @Nullable String symbol)`: adds `lang=en-US&region=US`, does a `postJson`, then `YahooJson.read` (the symbol keeps the `Not Found` mapping; calendars pass `null`) and returns the `VisualizationTable`
+- [x] `VisualizationTable.of(JsonNode root)`: result/document checks (`YFDataException` on a missing result list or non-array rows, empty on no rows), `columnIndex(id)`, `rows()`, cell readers `text`, `number`, `zeroAsNaN`, `instant`, `localDate`, `bool`
+- [x] refactor `EarningsDatesEndpoint` onto the three helpers with no behavior change (`body()` output byte-identical)
+- [x] write `VisualizationQueryTest` (nesting, operator case) and `VisualizationTableTest` (column lookup by id, duplicate ids keep the first, missing/null/empty-string cells, zero-as-NaN, bad date gives `YFDataException`)
+- [x] existing `EarningsDatesEndpointTest` passes unchanged
+- [x] run `./mvnw verify` - must pass before task 3
 
 ### Task 3: Add request values and models
 
