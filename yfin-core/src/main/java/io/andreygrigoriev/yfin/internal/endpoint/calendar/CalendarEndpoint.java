@@ -3,36 +3,72 @@ package io.andreygrigoriev.yfin.internal.endpoint.calendar;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.andreygrigoriev.yfin.Screener;
 import io.andreygrigoriev.yfin.exception.YFDataException;
+import io.andreygrigoriev.yfin.internal.endpoint.screener.ScreenerEndpoint;
 import io.andreygrigoriev.yfin.internal.endpoint.visualization.VisualizationEndpoint;
 import io.andreygrigoriev.yfin.internal.endpoint.visualization.VisualizationQuery;
 import io.andreygrigoriev.yfin.internal.endpoint.visualization.VisualizationTable;
 import io.andreygrigoriev.yfin.internal.http.YahooJson;
 import io.andreygrigoriev.yfin.internal.http.YahooSession;
+import io.andreygrigoriev.yfin.model.EarningsEvent;
 import io.andreygrigoriev.yfin.model.EconomicEvent;
 import io.andreygrigoriev.yfin.model.IpoEvent;
+import io.andreygrigoriev.yfin.model.ScreenerResult;
 import io.andreygrigoriev.yfin.model.SplitEvent;
 import io.andreygrigoriev.yfin.request.CalendarRequest;
+import io.andreygrigoriev.yfin.request.EarningsCalendarRequest;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.OptionalDouble;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Yahoo {@code POST /v1/finance/visualization} for the market-wide calendars, as yfinance 1.7.0
  * {@code Calendars}: the same entity types, sort fields, columns and upper-case query operators
  * ({@code PREDEFINED_CALENDARS}). Rows are mapped by column id.
  *
- * <p>yfinance turns {@code 0} into {@code NaN} in its {@code nan_cols} (IPO prices and shares,
- * economic values); this endpoint does the same.
+ * <p>yfinance turns {@code 0} into {@code NaN} in its {@code nan_cols} (EPS and surprise, IPO
+ * prices and shares, economic values); this endpoint does the same.
  */
 public final class CalendarEndpoint {
 
-    /** Zone of the IPO and split dates: Yahoo sends New York midnight. */
+    private static final Logger LOG = LoggerFactory.getLogger(CalendarEndpoint.class);
+
+    /**
+     * Zone of the earnings times (the query is {@code region = us}) and of the IPO and split dates
+     * (Yahoo sends New York midnight).
+     */
     static final ZoneId NEW_YORK = ZoneId.of("America/New_York");
+
+    /** Below this market-cap floor yfinance warns that the cutoff is probably a mistake. */
+    static final double LOW_MARKET_CAP = 10_000_000;
+
+    /** yfinance {@code screen(query="MOST_ACTIVES", count=200)}. */
+    static final Screener MOST_ACTIVES = Screener.predefined("most_actives").size(200);
+
+    /** yfinance {@code PREDEFINED_CALENDARS["sp_earnings"]}. */
+    static final Spec EARNINGS = new Spec(
+            "sp_earnings",
+            "intradaymarketcap",
+            List.of(
+                    "ticker",
+                    "companyshortname",
+                    "intradaymarketcap",
+                    "eventname",
+                    "startdatetime",
+                    "startdatetimetype",
+                    "epsestimate",
+                    "epsactual",
+                    "epssurprisepct"));
 
     /** yfinance {@code PREDEFINED_CALENDARS["ipo_info"]}. */
     static final Spec IPO = new Spec(
@@ -75,9 +111,38 @@ public final class CalendarEndpoint {
     private static final VisualizationQuery Q = VisualizationQuery.upperCase();
 
     private final VisualizationEndpoint visualization;
+    private final ScreenerEndpoint screener;
 
     public CalendarEndpoint(YahooSession session) {
-        this.visualization = new VisualizationEndpoint(Objects.requireNonNull(session, "session"));
+        Objects.requireNonNull(session, "session");
+        this.visualization = new VisualizationEndpoint(session);
+        this.screener = new ScreenerEndpoint(session);
+    }
+
+    /**
+     * US earnings announcements in the window, latest first.
+     *
+     * <p>With {@link EarningsCalendarRequest#filterMostActive()} on the first page, the {@code
+     * most_actives} screen (200 symbols, those under the market-cap floor dropped) restricts the
+     * result first, as yfinance does. If no symbol survives, the result is empty and no calendar
+     * request is made; yfinance would send an empty {@code OR}.
+     *
+     * @throws YFDataException for an error envelope or an unexpected payload, also from the screen
+     */
+    public List<EarningsEvent> earnings(EarningsCalendarRequest request) {
+        OptionalDouble marketCap = request.marketCap();
+        if (marketCap.isPresent() && marketCap.getAsDouble() < LOW_MARKET_CAP) {
+            LOG.warn("market cap {} is very low, did you mean to set it higher?", marketCap.getAsDouble());
+        }
+        List<String> mostActive = List.of();
+        if (request.filterMostActive() && request.offset() == 0) {
+            mostActive = mostActiveSymbols(screener.screen(MOST_ACTIVES), marketCap);
+            if (mostActive.isEmpty()) {
+                LOG.debug("no most-active symbol above the market cap: empty earnings calendar");
+                return List.of();
+            }
+        }
+        return parseEarnings(visualization.post(earningsBody(request, mostActive), null));
     }
 
     /**
@@ -105,6 +170,37 @@ public final class CalendarEndpoint {
      */
     public List<SplitEvent> splits(CalendarRequest request) {
         return parseSplits(visualization.post(splitsBody(request), null));
+    }
+
+    /** The yfinance body; {@code mostActive} becomes an {@code OR} of tickers when not empty. */
+    static ObjectNode earningsBody(EarningsCalendarRequest request, List<String> mostActive) {
+        var operands = new ArrayList<ObjectNode>();
+        operands.add(Q.eq("region", "us"));
+        operands.add(Q.or(Q.eq("eventtype", "EAD"), Q.eq("eventtype", "ERA")));
+        operands.add(Q.gte("startdatetime", request.start().toString()));
+        operands.add(Q.lte("startdatetime", request.end().toString()));
+        request.marketCap().ifPresent(cap -> operands.add(Q.gte("intradaymarketcap", cap)));
+        if (!mostActive.isEmpty()) {
+            operands.add(Q.or(mostActive.stream().map(s -> Q.eq("ticker", s)).toList()));
+        }
+        return body(EARNINGS, request.limit(), request.offset(), Q.and(operands));
+    }
+
+    /**
+     * The screen's symbols in order; with a floor, those whose {@code marketCap} is below it or
+     * missing (yfinance reads it as {@code 0}).
+     */
+    static List<String> mostActiveSymbols(ScreenerResult result, OptionalDouble marketCap) {
+        var out = new ArrayList<String>();
+        for (Map<String, Object> quote : result.quotes()) {
+            double cap = quote.get("marketCap") instanceof Number n ? n.doubleValue() : 0;
+            if (quote.get("symbol") instanceof String symbol
+                    && !symbol.isEmpty()
+                    && (marketCap.isEmpty() || cap >= marketCap.getAsDouble())) {
+                out.add(symbol);
+            }
+        }
+        return List.copyOf(out);
     }
 
     static ObjectNode ipoBody(CalendarRequest request) {
@@ -143,6 +239,35 @@ public final class CalendarEndpoint {
         body.put("offset", offset);
         body.set("query", query);
         return body;
+    }
+
+    /** Rows without a symbol or start time are skipped; latest first, ties in Yahoo's order. */
+    static List<EarningsEvent> parseEarnings(JsonNode root) {
+        return parseEarnings(VisualizationTable.of(root));
+    }
+
+    private static List<EarningsEvent> parseEarnings(VisualizationTable t) {
+        var out = new ArrayList<EarningsEvent>(t.rows().size());
+        for (JsonNode row : t.rows()) {
+            @Nullable String symbol = t.text(row, "ticker");
+            @Nullable Instant start = t.instant(row, "startdatetime");
+            if (symbol == null || start == null) {
+                continue;
+            }
+            out.add(new EarningsEvent(
+                    symbol,
+                    t.text(row, "companyshortname"),
+                    t.number(row, "intradaymarketcap"),
+                    t.text(row, "eventname"),
+                    start.atZone(NEW_YORK),
+                    t.text(row, "startdatetimetype"),
+                    t.zeroAsNaN(row, "epsestimate"),
+                    t.zeroAsNaN(row, "epsactual"),
+                    t.zeroAsNaN(row, "epssurprisepct")));
+        }
+        // yfinance sort_values; List.sort is stable, so ties keep Yahoo's order
+        out.sort(Comparator.comparing(EarningsEvent::startTime).reversed());
+        return List.copyOf(out);
     }
 
     /** Rows without a symbol are skipped. */

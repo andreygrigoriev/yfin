@@ -267,12 +267,12 @@
 - Modify: `yfin-core/src/main/java/io/andreygrigoriev/yfin/internal/endpoint/calendar/CalendarEndpoint.java`
 - Modify: `yfin-core/src/test/java/io/andreygrigoriev/yfin/internal/endpoint/calendar/CalendarEndpointTest.java`
 
-- [ ] `earnings(EarningsCalendarRequest)`: the base `AND[EQ region us, OR[EQ eventtype EAD, EQ eventtype ERA], GTE, LTE]`; append `GTE intradaymarketcap` when a cap is set; WARN log below 10M
-- [ ] the most-active operand: when `filterMostActive && offset == 0`, call the screener (`most_actives`, size 200) through the injected `ScreenerEndpoint` (or a `Supplier<ScreenerResult>` for testability), filter by cap, append `OR[EQ ticker ...]`; an empty survivor list returns `List.of()` without a visualization call
-- [ ] map to `EarningsEvent` in `America/New_York`, with zero → NaN for EPS/surprise; sort by `startTime` descending
-- [ ] write tests: body without filters, with a cap, with most-active (screener fixture → expected OR operands, cap filtering), most-active skipped when `offset > 0`, `filterMostActive(false)` makes no screener request
-- [ ] write tests: empty survivor list makes exactly one (screener) request and returns empty; a screener error propagates; parse plus descending sort from the fixture
-- [ ] run `./mvnw verify` - must pass before task 6
+- [x] `earnings(EarningsCalendarRequest)`: the base `AND[EQ region us, OR[EQ eventtype EAD, EQ eventtype ERA], GTE, LTE]`; append `GTE intradaymarketcap` when a cap is set; WARN log below 10M
+- [x] the most-active operand: when `filterMostActive && offset == 0`, call the screener (`most_actives`, size 200) through the injected `ScreenerEndpoint` (or a `Supplier<ScreenerResult>` for testability), filter by cap, append `OR[EQ ticker ...]`; an empty survivor list returns `List.of()` without a visualization call
+- [x] map to `EarningsEvent` in `America/New_York`, with zero → NaN for EPS/surprise; sort by `startTime` descending
+- [x] write tests: body without filters, with a cap, with most-active (screener fixture → expected OR operands, cap filtering), most-active skipped when `offset > 0`, `filterMostActive(false)` makes no screener request
+- [x] write tests: empty survivor list makes exactly one (screener) request and returns empty; a screener error propagates; parse plus descending sort from the fixture
+- [x] run `./mvnw verify` - must pass before task 6
 
 ### Task 6: Expose the calendars on YFinance
 
