@@ -4,6 +4,7 @@ import io.andreygrigoriev.yfin.exception.YFDownloadException;
 import io.andreygrigoriev.yfin.exception.YFTransportException;
 import io.andreygrigoriev.yfin.exception.YFinanceException;
 import io.andreygrigoriev.yfin.internal.cache.FileCache;
+import io.andreygrigoriev.yfin.internal.endpoint.calendar.CalendarEndpoint;
 import io.andreygrigoriev.yfin.internal.endpoint.screener.ScreenerEndpoint;
 import io.andreygrigoriev.yfin.internal.endpoint.search.LookupEndpoint;
 import io.andreygrigoriev.yfin.internal.endpoint.search.SearchEndpoint;
@@ -11,10 +12,16 @@ import io.andreygrigoriev.yfin.internal.http.JdkTransport;
 import io.andreygrigoriev.yfin.internal.http.RequestLimiter;
 import io.andreygrigoriev.yfin.internal.http.RetryPolicy;
 import io.andreygrigoriev.yfin.internal.http.YahooSession;
+import io.andreygrigoriev.yfin.model.EarningsEvent;
+import io.andreygrigoriev.yfin.model.EconomicEvent;
+import io.andreygrigoriev.yfin.model.IpoEvent;
 import io.andreygrigoriev.yfin.model.LookupResult;
 import io.andreygrigoriev.yfin.model.PriceHistory;
 import io.andreygrigoriev.yfin.model.ScreenerResult;
 import io.andreygrigoriev.yfin.model.SearchResult;
+import io.andreygrigoriev.yfin.model.SplitEvent;
+import io.andreygrigoriev.yfin.request.CalendarRequest;
+import io.andreygrigoriev.yfin.request.EarningsCalendarRequest;
 import io.andreygrigoriev.yfin.request.HistoryRequest;
 import io.andreygrigoriev.yfin.request.MarketRegion;
 import io.andreygrigoriev.yfin.request.ScreenerQuery;
@@ -260,6 +267,93 @@ public final class YFinance implements AutoCloseable {
     public ScreenerResult screen(Screener screener) {
         ensureOpen();
         return new ScreenerEndpoint(session()).screen(Objects.requireNonNull(screener, "screener"));
+    }
+
+    /**
+     * Earnings calendar with yfinance's defaults: today to today + 7 days, the first {@value
+     * CalendarRequest#DEFAULT_LIMIT} events of the most active US stocks; see {@link
+     * EarningsCalendarRequest#nextWeek()}.
+     *
+     * @throws IllegalStateException when the client is closed
+     */
+    public List<EarningsEvent> earningsCalendar() {
+        return earningsCalendar(EarningsCalendarRequest.nextWeek());
+    }
+
+    /**
+     * Runs the earnings calendar {@code request} (yfinance {@code Calendars.get_earnings_calendar}):
+     * US earnings events, latest first; empty when Yahoo has none. With {@link
+     * EarningsCalendarRequest#filterMostActive()} and offset {@code 0} it first runs the {@code
+     * most_actives} screen and keeps only its symbols.
+     *
+     * @throws IllegalStateException when the client is closed
+     */
+    public List<EarningsEvent> earningsCalendar(EarningsCalendarRequest request) {
+        ensureOpen();
+        return new CalendarEndpoint(session()).earnings(Objects.requireNonNull(request, "request"));
+    }
+
+    /**
+     * IPO calendar with yfinance's defaults: today to today + 7 days, the first {@value
+     * CalendarRequest#DEFAULT_LIMIT} events.
+     *
+     * @throws IllegalStateException when the client is closed
+     */
+    public List<IpoEvent> ipoCalendar() {
+        return ipoCalendar(CalendarRequest.nextWeek());
+    }
+
+    /**
+     * Runs the IPO calendar {@code request} (yfinance {@code Calendars.get_ipo_info_calendar}):
+     * IPOs priced, filed or amended in the window, in Yahoo's order; empty when Yahoo has none.
+     *
+     * @throws IllegalStateException when the client is closed
+     */
+    public List<IpoEvent> ipoCalendar(CalendarRequest request) {
+        ensureOpen();
+        return new CalendarEndpoint(session()).ipos(Objects.requireNonNull(request, "request"));
+    }
+
+    /**
+     * Economic-events calendar with yfinance's defaults: today to today + 7 days, the first {@value
+     * CalendarRequest#DEFAULT_LIMIT} events.
+     *
+     * @throws IllegalStateException when the client is closed
+     */
+    public List<EconomicEvent> economicEventsCalendar() {
+        return economicEventsCalendar(CalendarRequest.nextWeek());
+    }
+
+    /**
+     * Runs the economic-events calendar {@code request} (yfinance {@code
+     * Calendars.get_economic_events_calendar}), in Yahoo's order; empty when Yahoo has none.
+     *
+     * @throws IllegalStateException when the client is closed
+     */
+    public List<EconomicEvent> economicEventsCalendar(CalendarRequest request) {
+        ensureOpen();
+        return new CalendarEndpoint(session()).economicEvents(Objects.requireNonNull(request, "request"));
+    }
+
+    /**
+     * Splits calendar with yfinance's defaults: today to today + 7 days, the first {@value
+     * CalendarRequest#DEFAULT_LIMIT} events.
+     *
+     * @throws IllegalStateException when the client is closed
+     */
+    public List<SplitEvent> splitsCalendar() {
+        return splitsCalendar(CalendarRequest.nextWeek());
+    }
+
+    /**
+     * Runs the splits calendar {@code request} (yfinance {@code Calendars.get_splits_calendar}), in
+     * Yahoo's order; empty when Yahoo has none.
+     *
+     * @throws IllegalStateException when the client is closed
+     */
+    public List<SplitEvent> splitsCalendar(CalendarRequest request) {
+        ensureOpen();
+        return new CalendarEndpoint(session()).splits(Objects.requireNonNull(request, "request"));
     }
 
     /** Default region of {@link #sector(String)} and {@link #industry(String)}. */

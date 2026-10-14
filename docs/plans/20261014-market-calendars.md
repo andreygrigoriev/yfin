@@ -280,11 +280,11 @@
 - Modify: `yfin-core/src/main/java/io/andreygrigoriev/yfin/YFinance.java`
 - Create: `yfin-core/src/test/java/io/andreygrigoriev/yfin/CalendarsTest.java`
 
-- [ ] add `earningsCalendar()`/`earningsCalendar(EarningsCalendarRequest)`, `ipoCalendar()`/`ipoCalendar(CalendarRequest)`, `economicEventsCalendar()`/`(CalendarRequest)`, `splitsCalendar()`/`(CalendarRequest)`, with `ensureOpen()`, null checks and javadoc (yfinance name, defaults, `@throws`)
-- [ ] confirm `BuildSmokeTest` needs no change (the new types live in already-exported packages)
-- [ ] write `CalendarsTest` end-to-end through `FakeTransport` (cookie bootstrap + crumb setup from CLAUDE.md): each calendar returns parsed records; the no-arg overloads send a 7-day window starting today
-- [ ] write tests: a closed client throws `IllegalStateException`; a null request throws NPE
-- [ ] run `./mvnw verify` - must pass before task 7
+- [x] add `earningsCalendar()`/`earningsCalendar(EarningsCalendarRequest)`, `ipoCalendar()`/`ipoCalendar(CalendarRequest)`, `economicEventsCalendar()`/`(CalendarRequest)`, `splitsCalendar()`/`(CalendarRequest)`, with `ensureOpen()`, null checks and javadoc (yfinance name, defaults, `@throws`)
+- [x] confirm `BuildSmokeTest` needs no change (the new types live in already-exported packages)
+- [x] write `CalendarsTest` end-to-end through `FakeTransport` (cookie bootstrap + crumb setup from CLAUDE.md): each calendar returns parsed records; the no-arg overloads send a 7-day window starting today
+- [x] write tests: a closed client throws `IllegalStateException`; a null request throws NPE
+- [x] run `./mvnw verify` - must pass before task 7
 
 ### Task 7: Add Tablesaw and DFLib conversions
 
