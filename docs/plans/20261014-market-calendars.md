@@ -239,12 +239,12 @@
 - Create: `yfin-core/src/test/java/io/andreygrigoriev/yfin/request/CalendarRequestTest.java`
 - Create: `yfin-core/src/test/java/io/andreygrigoriev/yfin/model/CalendarModelsTest.java`
 
-- [ ] `CalendarRequest`: `between`, `from`, `nextWeek`, `limit`, `offset`, accessors, `equals`/`hashCode`/`toString`; javadoc examples and the yfinance mapping
-- [ ] `EarningsCalendarRequest`: the same, plus `marketCap(double)` (positive), `filterMostActive(boolean)`
-- [ ] the four model records with compact-constructor null checks; `EarningsEvent.isReported()`, `SplitEvent.ratio()`
-- [ ] write tests: defaults (limit 12, offset 0, +7 days), validation (`end < start`, limit 0/101, negative offset, non-positive market cap give IAE), copy semantics, equality
-- [ ] write model tests: `ratio()` with NaN/zero old worth, `isReported()`
-- [ ] run `./mvnw verify` - must pass before task 4
+- [x] `CalendarRequest`: `between`, `from`, `nextWeek`, `limit`, `offset`, accessors, `equals`/`hashCode`/`toString`; javadoc examples and the yfinance mapping
+- [x] `EarningsCalendarRequest`: the same, plus `marketCap(double)` (positive), `filterMostActive(boolean)`
+- [x] the four model records with compact-constructor null checks; `EarningsEvent.isReported()`, `SplitEvent.ratio()`
+- [x] write tests: defaults (limit 12, offset 0, +7 days), validation (`end < start`, limit 0/101, negative offset, non-positive market cap give IAE), copy semantics, equality
+- [x] write model tests: `ratio()` with NaN/zero old worth, `isReported()`
+- [x] run `./mvnw verify` - must pass before task 4
 
 ### Task 4: Implement IPO, economic-events and splits calendars
 
