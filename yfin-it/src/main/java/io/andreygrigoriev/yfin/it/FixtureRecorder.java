@@ -1,5 +1,6 @@
 package io.andreygrigoriev.yfin.it;
 
+import io.andreygrigoriev.yfin.Screener;
 import io.andreygrigoriev.yfin.YFinance;
 import io.andreygrigoriev.yfin.internal.http.JdkTransport;
 import io.andreygrigoriev.yfin.request.Frequency;
@@ -18,6 +19,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -120,11 +122,51 @@ public final class FixtureRecorder implements Transport {
                     yf -> yf.market("US").status()),
             FixtureCase.of(
                     "news", "aapl", "AAPL news (ncp)", yf -> yf.ticker("AAPL").news()),
-            FixtureCase.of(
-                    "earnings",
+            new FixtureCase(
                     "aapl",
                     "AAPL earnings dates",
+                    Map.of("visualization", "earnings"),
                     yf -> yf.ticker("AAPL").earningsDates()),
+            new FixtureCase(
+                    "most-actives",
+                    "200 most active stocks (earnings calendar filter)",
+                    Map.of("screener", "calendar"),
+                    yf -> yf.screen(Screener.predefined("most_actives").size(200))),
+            calendarCase(
+                    "earnings-week",
+                    "earnings calendar, next 7 days, most-active filter",
+                    yf -> RawCalendars.earnings(yf, nextWeek(), nextWeekEnd(), null)),
+            calendarCase(
+                    "earnings-week-mcap",
+                    "earnings calendar, next 7 days, market cap >= 1e9, most-active filter",
+                    yf -> RawCalendars.earnings(yf, nextWeek(), nextWeekEnd(), 1e9)),
+            calendarCase(
+                    "earnings-empty",
+                    "earnings calendar, a week in 1970",
+                    yf -> RawCalendars.earnings(yf, RawCalendars.PAST_START, RawCalendars.PAST_END, null)),
+            calendarCase("ipo-week", "IPO calendar, next 7 days", yf -> RawCalendars.ipos(nextWeek(), nextWeekEnd())),
+            calendarCase(
+                    "ipo-empty",
+                    "IPO calendar, a week in 1970",
+                    yf -> RawCalendars.ipos(RawCalendars.PAST_START, RawCalendars.PAST_END)),
+            calendarCase(
+                    "economic-week",
+                    "economic events calendar, next 7 days",
+                    yf -> RawCalendars.economicEvents(nextWeek(), nextWeekEnd())),
+            calendarCase(
+                    "economic-empty",
+                    "economic events calendar, a week in 1970",
+                    yf -> RawCalendars.economicEvents(RawCalendars.PAST_START, RawCalendars.PAST_END)),
+            calendarCase(
+                    "splits-week",
+                    "splits calendar, next 7 days",
+                    yf -> RawCalendars.splits(nextWeek(), nextWeekEnd())),
+            calendarCase(
+                    "splits-empty",
+                    "splits calendar, a week in 1970",
+                    yf -> RawCalendars.splits(RawCalendars.PAST_START, RawCalendars.PAST_END)),
+            calendarCase(
+                    "error", "unknown query operator (error envelope)", yf -> RawCalendars.badOperator(nextWeek())),
             new FixtureCase(
                     "aapl",
                     "AAPL full shares history",
@@ -188,6 +230,19 @@ public final class FixtureRecorder implements Transport {
         return recording.write();
     }
 
+    // TODO(market calendars, Task 8): replace with cases calling the public calendar API.
+    private static FixtureCase calendarCase(String name, String description, Consumer<YFinance> action) {
+        return new FixtureCase(name, description, Map.of("visualization", "calendar"), action);
+    }
+
+    private static LocalDate nextWeek() {
+        return LocalDate.now();
+    }
+
+    private static LocalDate nextWeekEnd() {
+        return nextWeek().plusDays(7);
+    }
+
     /** Endpoint directory for {@code request}, or {@code null} for session and unknown traffic. */
     static @Nullable String endpointOf(HttpRequest request) {
         String host = Objects.requireNonNullElse(request.uri().getHost(), "").toLowerCase(Locale.ROOT);
@@ -229,7 +284,7 @@ public final class FixtureRecorder implements Transport {
             return "screener";
         }
         if (path.equals("/v1/finance/visualization")) {
-            return "earnings";
+            return "visualization";
         }
         if (path.startsWith("/v1/finance/sectors/")) {
             return "sector";
@@ -384,6 +439,7 @@ public final class FixtureRecorder implements Transport {
         }
         try (JdkTransport jdk = JdkTransport.create()) {
             var recorder = new FixtureRecorder(jdk, root);
+            RawCalendars.use(recorder);
             try (YFinance client = YFinance.builder()
                     .transport(recorder)
                     .cache(Cache.none())

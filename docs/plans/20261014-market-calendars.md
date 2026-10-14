@@ -154,9 +154,32 @@
     (NaN when unknown), consistent with `Split.ratio`.
   - Rows without the key column (symbol / event name / start time) are skipped. A malformed date
     raises `YFDataException`.
-  - ⚠️ The exact wire types of `startdatetime`, `filingdate`, `amendeddate`, `optionable` and
-    `shares` must be confirmed from the recorded fixtures in Task 1 before the models are finalized.
-    Adjust the field types above if Yahoo sends something different (e.g. epoch millis or "Yes"/"No").
+  - Wire types confirmed from the Task 1 fixtures (`fixtures/calendar/`). Column ids equal the
+    `includeFields` names; each column also has a `type` (`STRING`, `NUMBER`, `DATE`, `BOOLEAN`):
+    - every `DATE` column (`startdatetime`, `filingdate`, `amendeddate`) is an ISO-8601 instant
+      string such as `"2026-10-15T12:30:00.000Z"`. IPO and split dates are New York midnight
+      (`04:00Z`/`05:00Z`), so `LocalDate`s are taken in `America/New_York`. Economic event times
+      are `00:00Z` instants.
+    - earnings: `intradaymarketcap`, `epsestimate`, `epsactual`, `epssurprisepct` are `NUMBER`.
+      `eventname` can be `null`. A not-yet-reported row has `epsactual = null` and
+      `epssurprisepct = 0.0` (the placeholder yfinance turns into NaN).
+    - IPO: `pricefrom`, `priceto`, `offerprice`, `shares` are `NUMBER` and often `null`;
+      `currencyname` is often `""` (map to `null`); `exchange_short_name`, `companyshortname` can
+      be `null`; `dealtype` is e.g. `"Expected"`.
+    - economic: `after_release_actual`, `consensus_estimate`, `prior_release_actual`,
+      `originally_reported_actual` are `STRING` numbers (`"1.8"`, `"-1111.9"`) or `null`.
+      yfinance does `astype("float64")` and then `0 → NaN`, so the readers parse numeric strings
+      (unparseable → NaN) before the zero rule. `country_code` is a two-letter code (`EU` too),
+      `period` is e.g. `"Sep"`, `"Q3"` or `null`.
+    - splits: `optionable` is `BOOLEAN`; `old_share_worth` and `share_worth` are integer
+      `NUMBER`s, and `share_worth` can be `0` (seen in old data), so `ratio()` gives `0` there.
+  - The model field types above are unchanged by these findings. `VisualizationTable.number` and
+    `zeroAsNaN` (Task 2) must accept numeric strings as well as numbers.
+  - Error fixture: an unknown `entityIdType` makes Yahoo answer HTTP 500 (retried as transient,
+    not recordable), so `calendar/error.json` uses an unknown query operator, which gives a 400
+    `finance.error` envelope (`Bad Request`, "Unsupported operator").
+  - The most-active screener response is recorded as `calendar/most-actives.json` (its own case).
+    Its quotes are not the same snapshot the `earnings-week*` cases filtered with.
 - **Flow**: `YFinance.xCalendar(req)`, then `ensureOpen()`, then `CalendarEndpoint` (builds the body
   with `VisualizationQuery`), then `VisualizationEndpoint.post` (`HttpRequest.postJson`, `YahooJson.read`
   for envelope errors), then `VisualizationTable`, then the records.
@@ -174,15 +197,16 @@
 
 **Files:**
 - Modify: `yfin-it/src/main/java/io/andreygrigoriev/yfin/it/FixtureRecorder.java`
+- ➕ Create: `yfin-it/src/main/java/io/andreygrigoriev/yfin/it/RawCalendars.java` (temporary)
 - Modify: `yfin-it/src/test/java/io/andreygrigoriev/yfin/it/FixtureRecorderTest.java`
 - Create: `yfin-core/src/test/resources/fixtures/calendar/*.json`
 
-- [ ] rename the `endpointOf` key for `/v1/finance/visualization` from `"earnings"` to `"visualization"`; change the existing AAPL earnings case to `Map.of("visualization", "earnings")` so its output path stays the same
-- [ ] since the API doesn't exist yet, add temporary recorder cases that post the yfinance bodies directly through the client's transport (or land this task together with Task 4 and record afterwards; pick whichever keeps the build green), covering: `earnings-week`, `earnings-week-mcap`, `ipo-week`, `economic-week`, `splits-week`, an empty window far in the past for each type (`*-empty`), and an error case (e.g. unknown `entityIdType` → `finance.error`)
-- [ ] record the screener response of the earnings case into `calendar/` as well (`Map.of("visualization", "calendar", "screener", "calendar")` gives `-1`/`-2` suffixes; or give the screener its own name)
-- [ ] inspect the fixtures and update the Technical Details models (⚠️ item) with the real column ids and types
-- [ ] update `FixtureRecorderTest` for the renamed endpoint key and the new cases
-- [ ] run `./mvnw verify` - must pass before task 2
+- [x] rename the `endpointOf` key for `/v1/finance/visualization` from `"earnings"` to `"visualization"`; change the existing AAPL earnings case to `Map.of("visualization", "earnings")` so its output path stays the same
+- [x] since the API doesn't exist yet, add temporary recorder cases that post the yfinance bodies directly through the client's transport (or land this task together with Task 4 and record afterwards; pick whichever keeps the build green), covering: `earnings-week`, `earnings-week-mcap`, `ipo-week`, `economic-week`, `splits-week`, an empty window far in the past for each type (`*-empty`), and an error case (e.g. unknown `entityIdType` → `finance.error`)
+- [x] record the screener response of the earnings case into `calendar/` as well (`Map.of("visualization", "calendar", "screener", "calendar")` gives `-1`/`-2` suffixes; or give the screener its own name)
+- [x] inspect the fixtures and update the Technical Details models (⚠️ item) with the real column ids and types
+- [x] update `FixtureRecorderTest` for the renamed endpoint key and the new cases
+- [x] run `./mvnw verify` - must pass before task 2
 
 ### Task 2: Extract the shared visualization layer
 
@@ -283,6 +307,7 @@
 - Modify: `yfin-it/src/test/java/io/andreygrigoriev/yfin/it/FixtureRecorderTest.java`
 
 - [ ] replace the temporary Task 1 recorder cases with cases calling the public API (`yf.earningsCalendar(...)` etc.), keeping the same fixture names
+- [ ] ➕ delete the temporary `yfin-it/.../RawCalendars.java` (Task 1 raw-body poster) and its two `FixtureRecorderTest` tests; the error case can stay raw (no public API sends an unknown operator) or be dropped
 - [ ] `CalendarsIT` (`-Plive`): each calendar over a 14-day window returns records with non-null key fields; earnings sorted descending; `limit(5)` gives at most 5 rows. Assert shape only; IPO/splits may legitimately be empty
 - [ ] update `FixtureRecorderTest` for the final cases
 - [ ] run `./mvnw verify` and `./mvnw -Plive verify` - must pass before task 9

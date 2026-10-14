@@ -2,7 +2,9 @@ package io.andreygrigoriev.yfin.it;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import io.andreygrigoriev.yfin.YFinance;
+import io.andreygrigoriev.yfin.internal.http.YahooJson;
 import io.andreygrigoriev.yfin.it.FixtureRecorder.FixtureCase;
 import io.andreygrigoriev.yfin.request.Period;
 import io.andreygrigoriev.yfin.spi.Cache;
@@ -222,7 +224,7 @@ class FixtureRecorderTest {
         assertThat(endpoint("https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved"))
                 .isEqualTo("screener");
         assertThat(endpoint("https://query1.finance.yahoo.com/v1/finance/visualization"))
-                .isEqualTo("earnings");
+                .isEqualTo("visualization");
         assertThat(endpoint("https://query1.finance.yahoo.com/v1/finance/sectors/technology"))
                 .isEqualTo("sector");
         assertThat(endpoint("https://query1.finance.yahoo.com/v1/finance/industries/semiconductors"))
@@ -270,6 +272,78 @@ class FixtureRecorderTest {
         assertThat(FixtureRecorder.select(List.of("shares/aapl")))
                 .singleElement()
                 .satisfies(c -> assertThat(c.endpoints()).containsExactly(Map.entry("timeseries", "shares")));
+    }
+
+    @Test
+    void visualizationCasesKeepTheirOutputDirectories() {
+        assertThat(FixtureRecorder.select(List.of("earnings/aapl")))
+                .singleElement()
+                .satisfies(c -> assertThat(c.endpoints()).containsExactly(Map.entry("visualization", "earnings")));
+        assertThat(FixtureRecorder.select(List.of(
+                        "calendar/earnings-week",
+                        "calendar/earnings-week-mcap",
+                        "calendar/earnings-empty",
+                        "calendar/ipo-week",
+                        "calendar/ipo-empty",
+                        "calendar/economic-week",
+                        "calendar/economic-empty",
+                        "calendar/splits-week",
+                        "calendar/splits-empty",
+                        "calendar/error")))
+                .allSatisfy(c -> assertThat(c.endpoints()).containsExactly(Map.entry("visualization", "calendar")));
+        assertThat(FixtureRecorder.select(List.of("calendar/most-actives")))
+                .singleElement()
+                .satisfies(c -> assertThat(c.endpoints()).containsExactly(Map.entry("screener", "calendar")));
+    }
+
+    @Test
+    void calendarCasePostsTheYfinanceBodyAndRecordsIntoCalendar() throws IOException {
+        fake.onPost("/v1/finance/visualization").respondFixture("calendar/splits-week.json");
+        RawCalendars.use(recorder);
+
+        List<Path> written = recorder.record(
+                FixtureRecorder.select(List.of("calendar/splits-week")).getFirst(), yf, log);
+
+        assertThat(written).containsExactly(root.resolve("calendar/splits-week.json"));
+        HttpRequest post = fake.requests().stream()
+                .filter(r -> r.method().equals("POST"))
+                .findFirst()
+                .orElseThrow();
+        assertThat(FakeTransport.parseQuery(post.uri().getRawQuery()))
+                .containsEntry("lang", List.of("en-US"))
+                .containsEntry("region", List.of("US"))
+                .containsKey("crumb");
+        JsonNode body = YahooJson.mapper().readTree(post.bodyAsString().orElseThrow());
+        assertThat(body.path("entityIdType").asText()).isEqualTo("splits");
+        assertThat(body.path("sortField").asText()).isEqualTo("startdatetime");
+        assertThat(body.path("query").path("operator").asText()).isEqualTo("AND");
+        assertThat(body.path("query").path("operands").path(0).path("operator").asText())
+                .isEqualTo("GTE");
+    }
+
+    @Test
+    void earningsCalendarCaseFiltersMostActiveByMarketCap() throws IOException {
+        fake.onGet("/v1/finance/screener/predefined/saved").respondFixture("calendar/most-actives.json");
+        fake.onPost("/v1/finance/visualization").respondFixture("calendar/earnings-week-mcap.json");
+        RawCalendars.use(recorder);
+
+        List<Path> written = recorder.record(
+                FixtureRecorder.select(List.of("calendar/earnings-week-mcap")).getFirst(), yf, log);
+
+        assertThat(written).containsExactly(root.resolve("calendar/earnings-week-mcap.json"));
+        HttpRequest post = fake.requests().stream()
+                .filter(r -> r.uri().getPath().equals("/v1/finance/visualization"))
+                .findFirst()
+                .orElseThrow();
+        JsonNode operands = YahooJson.mapper()
+                .readTree(post.bodyAsString().orElseThrow())
+                .path("query")
+                .path("operands");
+        assertThat(operands.path(4).path("operands").path(1).asDouble()).isEqualTo(1e9);
+        JsonNode tickers = operands.path(5).path("operands");
+        assertThat(tickers.size()).isPositive();
+        assertThat(tickers.path(0).path("operator").asText()).isEqualTo("EQ");
+        assertThat(tickers.path(0).path("operands").path(0).asText()).isEqualTo("ticker");
     }
 
     private static String endpoint(String uri) {
