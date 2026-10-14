@@ -6,15 +6,20 @@ import io.andreygrigoriev.yfin.model.Bar;
 import io.andreygrigoriev.yfin.model.CapitalGain;
 import io.andreygrigoriev.yfin.model.Dividend;
 import io.andreygrigoriev.yfin.model.EarningsDate;
+import io.andreygrigoriev.yfin.model.EarningsEvent;
+import io.andreygrigoriev.yfin.model.EconomicEvent;
 import io.andreygrigoriev.yfin.model.FinancialStatement;
 import io.andreygrigoriev.yfin.model.HistoryMetadata;
 import io.andreygrigoriev.yfin.model.Holder;
+import io.andreygrigoriev.yfin.model.IpoEvent;
 import io.andreygrigoriev.yfin.model.LineItem;
 import io.andreygrigoriev.yfin.model.OptionContract;
 import io.andreygrigoriev.yfin.model.PriceHistory;
 import io.andreygrigoriev.yfin.model.Split;
+import io.andreygrigoriev.yfin.model.SplitEvent;
 import io.andreygrigoriev.yfin.request.Frequency;
 import io.andreygrigoriev.yfin.request.Interval;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -303,5 +308,175 @@ class TablesawAdapterTest {
         assertThat(t.doubleColumn("Reported EPS").getDouble(0)).isNaN();
         assertThat(t.doubleColumn("Surprise(%)").getDouble(1)).isEqualTo(6.67);
         assertThat(TablesawAdapter.earningsDatesToTable(List.of()).rowCount()).isZero();
+    }
+
+    @Test
+    void earningsCalendar() {
+        Table t = TablesawAdapter.earningsCalendarToTable(List.of(
+                new EarningsEvent(
+                        "AAPL",
+                        "Apple Inc.",
+                        3.5e12,
+                        "Q1 2025 Earnings",
+                        at(30, 16, 30),
+                        "AMC",
+                        1.6,
+                        Double.NaN,
+                        Double.NaN),
+                new EarningsEvent("XYZ", null, 1e9, null, at(3, 8, 0), null, 0.5, 0.6, 20.0)));
+
+        assertThat(t.name()).isEqualTo("earnings_calendar");
+        assertThat(t.columnNames())
+                .containsExactly(
+                        "Symbol",
+                        "Company",
+                        "Marketcap",
+                        "Event Name",
+                        "Event Start Date",
+                        "Timing",
+                        "EPS Estimate",
+                        "Reported EPS",
+                        "Surprise(%)");
+        assertThat(t.types())
+                .containsExactly(
+                        ColumnType.STRING,
+                        ColumnType.STRING,
+                        ColumnType.DOUBLE,
+                        ColumnType.STRING,
+                        ColumnType.LOCAL_DATE_TIME,
+                        ColumnType.STRING,
+                        ColumnType.DOUBLE,
+                        ColumnType.DOUBLE,
+                        ColumnType.DOUBLE);
+        assertThat(t.stringColumn("Symbol").get(0)).isEqualTo("AAPL");
+        assertThat(t.dateTimeColumn("Event Start Date").get(0)).isEqualTo(LocalDateTime.of(2025, 3, 30, 16, 30));
+        assertThat(t.stringColumn("Timing").get(0)).isEqualTo("AMC");
+        assertThat(t.doubleColumn("Reported EPS").getDouble(0)).isNaN();
+        assertThat(t.stringColumn("Company").isMissing(1)).isTrue();
+        assertThat(t.stringColumn("Event Name").isMissing(1)).isTrue();
+        assertThat(t.stringColumn("Timing").isMissing(1)).isTrue();
+        assertThat(t.doubleColumn("Surprise(%)").getDouble(1)).isEqualTo(20.0);
+        Table empty = TablesawAdapter.earningsCalendarToTable(List.of());
+        assertThat(empty.rowCount()).isZero();
+        assertThat(empty.columnCount()).isEqualTo(9);
+    }
+
+    @Test
+    void ipoCalendar() {
+        Table t = TablesawAdapter.ipoCalendarToTable(List.of(
+                new IpoEvent(
+                        "NEWC",
+                        "NewCo",
+                        "NASDAQ",
+                        LocalDate.of(2025, 3, 1),
+                        LocalDate.of(2025, 3, 10),
+                        null,
+                        10,
+                        12,
+                        Double.NaN,
+                        "USD",
+                        5e6,
+                        "Expected"),
+                new IpoEvent(
+                        "OLDC", null, null, null, null, null, Double.NaN, Double.NaN, 11, null, Double.NaN, null)));
+
+        assertThat(t.name()).isEqualTo("ipo_calendar");
+        assertThat(t.columnNames())
+                .containsExactly(
+                        "Symbol",
+                        "Company",
+                        "Exchange",
+                        "Filing Date",
+                        "Date",
+                        "Amended Date",
+                        "Price From",
+                        "Price To",
+                        "Price",
+                        "Currency",
+                        "Shares",
+                        "Action");
+        assertThat(t.types())
+                .containsExactly(
+                        ColumnType.STRING,
+                        ColumnType.STRING,
+                        ColumnType.STRING,
+                        ColumnType.LOCAL_DATE,
+                        ColumnType.LOCAL_DATE,
+                        ColumnType.LOCAL_DATE,
+                        ColumnType.DOUBLE,
+                        ColumnType.DOUBLE,
+                        ColumnType.DOUBLE,
+                        ColumnType.STRING,
+                        ColumnType.DOUBLE,
+                        ColumnType.STRING);
+        assertThat(t.dateColumn("Date").get(0)).isEqualTo(LocalDate.of(2025, 3, 10));
+        assertThat(t.dateColumn("Amended Date").isMissing(0)).isTrue();
+        assertThat(t.doubleColumn("Price To").getDouble(0)).isEqualTo(12.0);
+        assertThat(t.doubleColumn("Price").getDouble(0)).isNaN();
+        assertThat(t.stringColumn("Action").get(0)).isEqualTo("Expected");
+        assertThat(t.dateColumn("Filing Date").isMissing(1)).isTrue();
+        assertThat(t.stringColumn("Currency").isMissing(1)).isTrue();
+        assertThat(t.doubleColumn("Price").getDouble(1)).isEqualTo(11.0);
+        Table empty = TablesawAdapter.ipoCalendarToTable(List.of());
+        assertThat(empty.rowCount()).isZero();
+        assertThat(empty.columnCount()).isEqualTo(12);
+    }
+
+    @Test
+    void economicEventsCalendar() {
+        Instant time = Instant.parse("2025-03-12T12:30:00Z");
+        Table t = TablesawAdapter.economicEventsToTable(List.of(
+                new EconomicEvent("CPI", "US", time, "Feb", 2.8, 2.9, 3.0, Double.NaN),
+                new EconomicEvent("GDP", null, time, null, Double.NaN, Double.NaN, Double.NaN, Double.NaN)));
+
+        assertThat(t.name()).isEqualTo("economic_events_calendar");
+        assertThat(t.columnNames())
+                .containsExactly("Event", "Region", "Event Time", "For", "Actual", "Expected", "Last", "Revised");
+        assertThat(t.types())
+                .containsExactly(
+                        ColumnType.STRING,
+                        ColumnType.STRING,
+                        ColumnType.INSTANT,
+                        ColumnType.STRING,
+                        ColumnType.DOUBLE,
+                        ColumnType.DOUBLE,
+                        ColumnType.DOUBLE,
+                        ColumnType.DOUBLE);
+        assertThat(t.instantColumn("Event Time").get(0)).isEqualTo(time);
+        assertThat(t.stringColumn("For").get(0)).isEqualTo("Feb");
+        assertThat(t.doubleColumn("Expected").getDouble(0)).isEqualTo(2.9);
+        assertThat(t.doubleColumn("Revised").getDouble(0)).isNaN();
+        assertThat(t.stringColumn("Region").isMissing(1)).isTrue();
+        assertThat(t.stringColumn("For").isMissing(1)).isTrue();
+        Table empty = TablesawAdapter.economicEventsToTable(List.of());
+        assertThat(empty.rowCount()).isZero();
+        assertThat(empty.columnCount()).isEqualTo(8);
+    }
+
+    @Test
+    void splitsCalendar() {
+        Table t = TablesawAdapter.splitsCalendarToTable(List.of(
+                new SplitEvent("NVDA", "NVIDIA", LocalDate.of(2025, 3, 10), true, 1, 10),
+                new SplitEvent("XYZ", null, LocalDate.of(2025, 3, 11), null, 3, 1)));
+
+        assertThat(t.name()).isEqualTo("splits_calendar");
+        assertThat(t.columnNames())
+                .containsExactly("Symbol", "Company", "Payable On", "Optionable", "Old Share Worth", "Share Worth");
+        assertThat(t.types())
+                .containsExactly(
+                        ColumnType.STRING,
+                        ColumnType.STRING,
+                        ColumnType.LOCAL_DATE,
+                        ColumnType.BOOLEAN,
+                        ColumnType.DOUBLE,
+                        ColumnType.DOUBLE);
+        assertThat(t.dateColumn("Payable On").get(0)).isEqualTo(LocalDate.of(2025, 3, 10));
+        assertThat(t.booleanColumn("Optionable").get(0)).isTrue();
+        assertThat(t.doubleColumn("Share Worth").getDouble(0)).isEqualTo(10.0);
+        assertThat(t.stringColumn("Company").isMissing(1)).isTrue();
+        assertThat(t.booleanColumn("Optionable").isMissing(1)).isTrue();
+        Table empty = TablesawAdapter.splitsCalendarToTable(List.of());
+        assertThat(empty.rowCount()).isZero();
+        assertThat(empty.columnCount()).isEqualTo(6);
     }
 }

@@ -4,11 +4,15 @@ import io.andreygrigoriev.yfin.model.Bar;
 import io.andreygrigoriev.yfin.model.CapitalGain;
 import io.andreygrigoriev.yfin.model.Dividend;
 import io.andreygrigoriev.yfin.model.EarningsDate;
+import io.andreygrigoriev.yfin.model.EarningsEvent;
+import io.andreygrigoriev.yfin.model.EconomicEvent;
 import io.andreygrigoriev.yfin.model.FinancialStatement;
 import io.andreygrigoriev.yfin.model.Holder;
+import io.andreygrigoriev.yfin.model.IpoEvent;
 import io.andreygrigoriev.yfin.model.OptionContract;
 import io.andreygrigoriev.yfin.model.PriceHistory;
 import io.andreygrigoriev.yfin.model.Split;
+import io.andreygrigoriev.yfin.model.SplitEvent;
 import io.andreygrigoriev.yfin.request.Interval;
 import java.time.LocalDate;
 import java.time.ZonedDateTime;
@@ -176,6 +180,105 @@ public final class DFLibAdapter {
                         doubles(dates, EarningsDate::epsEstimate),
                         doubles(dates, EarningsDate::reportedEps),
                         doubles(dates, EarningsDate::surprisePercent));
+    }
+
+    /**
+     * The earnings calendar as yfinance's {@code Calendars.get_earnings_calendar()}: {@code Symbol},
+     * {@code Company}, {@code Marketcap}, {@code Event Name}, {@code Event Start Date} (in {@code
+     * America/New_York}), {@code Timing}, {@code EPS Estimate}, {@code Reported EPS}, {@code
+     * Surprise(%)}.
+     */
+    public static DataFrame earningsCalendarToDataFrame(List<EarningsEvent> events) {
+        return DataFrame.byColumn(
+                        "Symbol",
+                        "Company",
+                        "Marketcap",
+                        "Event Name",
+                        "Event Start Date",
+                        "Timing",
+                        "EPS Estimate",
+                        "Reported EPS",
+                        "Surprise(%)")
+                .of(
+                        objects(events, EarningsEvent::symbol),
+                        objects(events, EarningsEvent::companyName),
+                        doubles(events, EarningsEvent::marketCap),
+                        objects(events, EarningsEvent::eventName),
+                        objects(events, EarningsEvent::startTime),
+                        objects(events, EarningsEvent::timing),
+                        doubles(events, EarningsEvent::epsEstimate),
+                        doubles(events, EarningsEvent::reportedEps),
+                        doubles(events, EarningsEvent::surprisePercent));
+    }
+
+    /**
+     * The IPO calendar as yfinance's {@code Calendars.get_ipo_info_calendar()}: {@code Symbol},
+     * {@code Company}, {@code Exchange}, {@code Filing Date}, {@code Date}, {@code Amended Date},
+     * {@code Price From}, {@code Price To}, {@code Price}, {@code Currency}, {@code Shares}, {@code
+     * Action}.
+     */
+    public static DataFrame ipoCalendarToDataFrame(List<IpoEvent> events) {
+        return DataFrame.byColumn(
+                        "Symbol",
+                        "Company",
+                        "Exchange",
+                        "Filing Date",
+                        "Date",
+                        "Amended Date",
+                        "Price From",
+                        "Price To",
+                        "Price",
+                        "Currency",
+                        "Shares",
+                        "Action")
+                .of(
+                        objects(events, IpoEvent::symbol),
+                        objects(events, IpoEvent::companyName),
+                        objects(events, IpoEvent::exchange),
+                        objects(events, IpoEvent::filingDate),
+                        objects(events, IpoEvent::date),
+                        objects(events, IpoEvent::amendedDate),
+                        doubles(events, IpoEvent::priceFrom),
+                        doubles(events, IpoEvent::priceTo),
+                        doubles(events, IpoEvent::offerPrice),
+                        objects(events, IpoEvent::currency),
+                        doubles(events, IpoEvent::shares),
+                        objects(events, IpoEvent::dealType));
+    }
+
+    /**
+     * The economic events calendar as yfinance's {@code Calendars.get_economic_events_calendar()}:
+     * {@code Event}, {@code Region}, {@code Event Time} (an {@link java.time.Instant}, since the
+     * events have no exchange zone), {@code For}, {@code Actual}, {@code Expected}, {@code Last},
+     * {@code Revised}.
+     */
+    public static DataFrame economicEventsToDataFrame(List<EconomicEvent> events) {
+        return DataFrame.byColumn("Event", "Region", "Event Time", "For", "Actual", "Expected", "Last", "Revised")
+                .of(
+                        objects(events, EconomicEvent::event),
+                        objects(events, EconomicEvent::region),
+                        objects(events, EconomicEvent::time),
+                        objects(events, EconomicEvent::period),
+                        doubles(events, EconomicEvent::actual),
+                        doubles(events, EconomicEvent::expected),
+                        doubles(events, EconomicEvent::last),
+                        doubles(events, EconomicEvent::revised));
+    }
+
+    /**
+     * The splits calendar as yfinance's {@code Calendars.get_splits_calendar()}: {@code Symbol},
+     * {@code Company}, {@code Payable On}, {@code Optionable} (a nullable {@code Boolean}), {@code Old
+     * Share Worth}, {@code Share Worth}.
+     */
+    public static DataFrame splitsCalendarToDataFrame(List<SplitEvent> events) {
+        return DataFrame.byColumn("Symbol", "Company", "Payable On", "Optionable", "Old Share Worth", "Share Worth")
+                .of(
+                        objects(events, SplitEvent::symbol),
+                        objects(events, SplitEvent::companyName),
+                        objects(events, SplitEvent::payableDate),
+                        objects(events, SplitEvent::optionable),
+                        doubles(events, SplitEvent::oldShareWorth),
+                        doubles(events, SplitEvent::newShareWorth));
     }
 
     private static DataFrame frame(List<String> names, List<Series<?>> columns) {

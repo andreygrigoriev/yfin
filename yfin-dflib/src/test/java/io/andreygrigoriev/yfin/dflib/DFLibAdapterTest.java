@@ -6,15 +6,20 @@ import io.andreygrigoriev.yfin.model.Bar;
 import io.andreygrigoriev.yfin.model.CapitalGain;
 import io.andreygrigoriev.yfin.model.Dividend;
 import io.andreygrigoriev.yfin.model.EarningsDate;
+import io.andreygrigoriev.yfin.model.EarningsEvent;
+import io.andreygrigoriev.yfin.model.EconomicEvent;
 import io.andreygrigoriev.yfin.model.FinancialStatement;
 import io.andreygrigoriev.yfin.model.HistoryMetadata;
 import io.andreygrigoriev.yfin.model.Holder;
+import io.andreygrigoriev.yfin.model.IpoEvent;
 import io.andreygrigoriev.yfin.model.LineItem;
 import io.andreygrigoriev.yfin.model.OptionContract;
 import io.andreygrigoriev.yfin.model.PriceHistory;
 import io.andreygrigoriev.yfin.model.Split;
+import io.andreygrigoriev.yfin.model.SplitEvent;
 import io.andreygrigoriev.yfin.request.Frequency;
 import io.andreygrigoriev.yfin.request.Interval;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -297,5 +302,128 @@ class DFLibAdapterTest {
         assertThat(doubles(df, "Reported EPS")[0]).isNaN();
         assertThat(doubles(df, "Surprise(%)")[1]).isEqualTo(6.67);
         assertThat(DFLibAdapter.earningsDatesToDataFrame(List.of()).height()).isZero();
+    }
+
+    @Test
+    void earningsCalendar() {
+        DataFrame df = DFLibAdapter.earningsCalendarToDataFrame(List.of(
+                new EarningsEvent(
+                        "AAPL",
+                        "Apple Inc.",
+                        3.5e12,
+                        "Q1 2025 Earnings",
+                        at(30, 16, 30),
+                        "AMC",
+                        1.6,
+                        Double.NaN,
+                        Double.NaN),
+                new EarningsEvent("XYZ", null, 1e9, null, at(3, 8, 0), null, 0.5, 0.6, 20.0)));
+
+        assertThat(names(df))
+                .containsExactly(
+                        "Symbol",
+                        "Company",
+                        "Marketcap",
+                        "Event Name",
+                        "Event Start Date",
+                        "Timing",
+                        "EPS Estimate",
+                        "Reported EPS",
+                        "Surprise(%)");
+        assertThat(df.getColumn("Symbol").get(0)).isEqualTo("AAPL");
+        assertThat(df.getColumn("Event Start Date").get(0)).isEqualTo(at(30, 16, 30));
+        assertThat(df.getColumn("Timing").get(0)).isEqualTo("AMC");
+        assertThat(df.getColumn("Marketcap")).isInstanceOf(DoubleSeries.class);
+        assertThat(doubles(df, "Reported EPS")[0]).isNaN();
+        assertThat(df.getColumn("Company").get(1)).isNull();
+        assertThat(df.getColumn("Event Name").get(1)).isNull();
+        assertThat(doubles(df, "Surprise(%)")[1]).isEqualTo(20.0);
+        DataFrame empty = DFLibAdapter.earningsCalendarToDataFrame(List.of());
+        assertThat(empty.height()).isZero();
+        assertThat(empty.width()).isEqualTo(9);
+    }
+
+    @Test
+    void ipoCalendar() {
+        DataFrame df = DFLibAdapter.ipoCalendarToDataFrame(List.of(
+                new IpoEvent(
+                        "NEWC",
+                        "NewCo",
+                        "NASDAQ",
+                        LocalDate.of(2025, 3, 1),
+                        LocalDate.of(2025, 3, 10),
+                        null,
+                        10,
+                        12,
+                        Double.NaN,
+                        "USD",
+                        5e6,
+                        "Expected"),
+                new IpoEvent(
+                        "OLDC", null, null, null, null, null, Double.NaN, Double.NaN, 11, null, Double.NaN, null)));
+
+        assertThat(names(df))
+                .containsExactly(
+                        "Symbol",
+                        "Company",
+                        "Exchange",
+                        "Filing Date",
+                        "Date",
+                        "Amended Date",
+                        "Price From",
+                        "Price To",
+                        "Price",
+                        "Currency",
+                        "Shares",
+                        "Action");
+        assertThat(df.getColumn("Date").get(0)).isEqualTo(LocalDate.of(2025, 3, 10));
+        assertThat(df.getColumn("Amended Date").get(0)).isNull();
+        assertThat(doubles(df, "Price To")[0]).isEqualTo(12.0);
+        assertThat(doubles(df, "Price")[0]).isNaN();
+        assertThat(df.getColumn("Action").get(0)).isEqualTo("Expected");
+        assertThat(df.getColumn("Filing Date").get(1)).isNull();
+        assertThat(df.getColumn("Currency").get(1)).isNull();
+        assertThat(doubles(df, "Price")[1]).isEqualTo(11.0);
+        DataFrame empty = DFLibAdapter.ipoCalendarToDataFrame(List.of());
+        assertThat(empty.height()).isZero();
+        assertThat(empty.width()).isEqualTo(12);
+    }
+
+    @Test
+    void economicEventsCalendar() {
+        Instant time = Instant.parse("2025-03-12T12:30:00Z");
+        DataFrame df = DFLibAdapter.economicEventsToDataFrame(List.of(
+                new EconomicEvent("CPI", "US", time, "Feb", 2.8, 2.9, 3.0, Double.NaN),
+                new EconomicEvent("GDP", null, time, null, Double.NaN, Double.NaN, Double.NaN, Double.NaN)));
+
+        assertThat(names(df))
+                .containsExactly("Event", "Region", "Event Time", "For", "Actual", "Expected", "Last", "Revised");
+        assertThat(df.getColumn("Event Time").get(0)).isEqualTo(time);
+        assertThat(df.getColumn("For").get(0)).isEqualTo("Feb");
+        assertThat(doubles(df, "Expected")[0]).isEqualTo(2.9);
+        assertThat(doubles(df, "Revised")[0]).isNaN();
+        assertThat(df.getColumn("Region").get(1)).isNull();
+        assertThat(df.getColumn("For").get(1)).isNull();
+        DataFrame empty = DFLibAdapter.economicEventsToDataFrame(List.of());
+        assertThat(empty.height()).isZero();
+        assertThat(empty.width()).isEqualTo(8);
+    }
+
+    @Test
+    void splitsCalendar() {
+        DataFrame df = DFLibAdapter.splitsCalendarToDataFrame(List.of(
+                new SplitEvent("NVDA", "NVIDIA", LocalDate.of(2025, 3, 10), true, 1, 10),
+                new SplitEvent("XYZ", null, LocalDate.of(2025, 3, 11), null, 3, 1)));
+
+        assertThat(names(df))
+                .containsExactly("Symbol", "Company", "Payable On", "Optionable", "Old Share Worth", "Share Worth");
+        assertThat(df.getColumn("Payable On").get(0)).isEqualTo(LocalDate.of(2025, 3, 10));
+        assertThat(df.getColumn("Optionable").get(0)).isEqualTo(true);
+        assertThat(doubles(df, "Share Worth")[0]).isEqualTo(10.0);
+        assertThat(df.getColumn("Company").get(1)).isNull();
+        assertThat(df.getColumn("Optionable").get(1)).isNull();
+        DataFrame empty = DFLibAdapter.splitsCalendarToDataFrame(List.of());
+        assertThat(empty.height()).isZero();
+        assertThat(empty.width()).isEqualTo(6);
     }
 }

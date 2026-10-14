@@ -294,10 +294,10 @@
 - Modify: `yfin-dflib/src/main/java/io/andreygrigoriev/yfin/dflib/DFLibAdapter.java`
 - Modify: `yfin-dflib/src/test/java/io/andreygrigoriev/yfin/dflib/DFLibAdapterTest.java`
 
-- [ ] add `earningsCalendarToTable`, `ipoCalendarToTable`, `economicEventsToTable`, `splitsCalendarToTable` (column names follow yfinance's renamed DataFrame columns, e.g. `Symbol`, `Company`, `Marketcap`, `Event Start Date`, `Timing`, `EPS Estimate`, `Reported EPS`, `Surprise(%)`), matching the style of `earningsDatesToTable`
-- [ ] add the DFLib equivalents in `DFLibAdapter` with the same column names
-- [ ] write tests for both adapters: column names and types, values, NaN and null handling, empty list gives an empty table with columns
-- [ ] run `./mvnw verify` - must pass before task 8
+- [x] add `earningsCalendarToTable`, `ipoCalendarToTable`, `economicEventsToTable`, `splitsCalendarToTable` (column names follow yfinance's renamed DataFrame columns, e.g. `Symbol`, `Company`, `Marketcap`, `Event Start Date`, `Timing`, `EPS Estimate`, `Reported EPS`, `Surprise(%)`), matching the style of `earningsDatesToTable`
+- [x] add the DFLib equivalents in `DFLibAdapter` with the same column names
+- [x] write tests for both adapters: column names and types, values, NaN and null handling, empty list gives an empty table with columns
+- [x] run `./mvnw verify` - must pass before task 8
 
 ### Task 8: Live ITs and final recorder cases
 

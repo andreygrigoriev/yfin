@@ -4,12 +4,16 @@ import io.andreygrigoriev.yfin.model.Bar;
 import io.andreygrigoriev.yfin.model.CapitalGain;
 import io.andreygrigoriev.yfin.model.Dividend;
 import io.andreygrigoriev.yfin.model.EarningsDate;
+import io.andreygrigoriev.yfin.model.EarningsEvent;
+import io.andreygrigoriev.yfin.model.EconomicEvent;
 import io.andreygrigoriev.yfin.model.FinancialStatement;
 import io.andreygrigoriev.yfin.model.Holder;
+import io.andreygrigoriev.yfin.model.IpoEvent;
 import io.andreygrigoriev.yfin.model.LineItem;
 import io.andreygrigoriev.yfin.model.OptionContract;
 import io.andreygrigoriev.yfin.model.PriceHistory;
 import io.andreygrigoriev.yfin.model.Split;
+import io.andreygrigoriev.yfin.model.SplitEvent;
 import io.andreygrigoriev.yfin.request.Interval;
 import java.time.LocalDate;
 import java.time.ZonedDateTime;
@@ -25,6 +29,7 @@ import tech.tablesaw.api.BooleanColumn;
 import tech.tablesaw.api.DateColumn;
 import tech.tablesaw.api.DateTimeColumn;
 import tech.tablesaw.api.DoubleColumn;
+import tech.tablesaw.api.InstantColumn;
 import tech.tablesaw.api.LongColumn;
 import tech.tablesaw.api.StringColumn;
 import tech.tablesaw.api.Table;
@@ -256,6 +261,149 @@ public final class TablesawAdapter {
         return Table.create("earnings_dates", date, estimate, reported, surprise);
     }
 
+    /**
+     * The earnings calendar as yfinance's {@code Calendars.get_earnings_calendar()}: {@code Symbol},
+     * {@code Company}, {@code Marketcap}, {@code Event Name}, {@code Event Start Date} (New York local
+     * time), {@code Timing}, {@code EPS Estimate}, {@code Reported EPS}, {@code Surprise(%)}.
+     */
+    public static Table earningsCalendarToTable(List<EarningsEvent> events) {
+        var symbol = StringColumn.create("Symbol");
+        var company = StringColumn.create("Company");
+        var marketCap = DoubleColumn.create("Marketcap");
+        var eventName = StringColumn.create("Event Name");
+        var start = DateTimeColumn.create("Event Start Date");
+        var timing = StringColumn.create("Timing");
+        var estimate = DoubleColumn.create("EPS Estimate");
+        var reported = DoubleColumn.create("Reported EPS");
+        var surprise = DoubleColumn.create("Surprise(%)");
+        for (EarningsEvent e : events) {
+            symbol.append(e.symbol());
+            appendString(company, e.companyName());
+            marketCap.append(e.marketCap());
+            appendString(eventName, e.eventName());
+            start.append(e.startTime().toLocalDateTime());
+            appendString(timing, e.timing());
+            estimate.append(e.epsEstimate());
+            reported.append(e.reportedEps());
+            surprise.append(e.surprisePercent());
+        }
+        return Table.create(
+                "earnings_calendar",
+                symbol,
+                company,
+                marketCap,
+                eventName,
+                start,
+                timing,
+                estimate,
+                reported,
+                surprise);
+    }
+
+    /**
+     * The IPO calendar as yfinance's {@code Calendars.get_ipo_info_calendar()}: {@code Symbol},
+     * {@code Company}, {@code Exchange}, {@code Filing Date}, {@code Date}, {@code Amended Date},
+     * {@code Price From}, {@code Price To}, {@code Price}, {@code Currency}, {@code Shares}, {@code
+     * Action}.
+     */
+    public static Table ipoCalendarToTable(List<IpoEvent> events) {
+        var symbol = StringColumn.create("Symbol");
+        var company = StringColumn.create("Company");
+        var exchange = StringColumn.create("Exchange");
+        var filingDate = DateColumn.create("Filing Date");
+        var date = DateColumn.create("Date");
+        var amendedDate = DateColumn.create("Amended Date");
+        var priceFrom = DoubleColumn.create("Price From");
+        var priceTo = DoubleColumn.create("Price To");
+        var price = DoubleColumn.create("Price");
+        var currency = StringColumn.create("Currency");
+        var shares = DoubleColumn.create("Shares");
+        var action = StringColumn.create("Action");
+        for (IpoEvent e : events) {
+            symbol.append(e.symbol());
+            appendString(company, e.companyName());
+            appendString(exchange, e.exchange());
+            appendDate(filingDate, e.filingDate());
+            appendDate(date, e.date());
+            appendDate(amendedDate, e.amendedDate());
+            priceFrom.append(e.priceFrom());
+            priceTo.append(e.priceTo());
+            price.append(e.offerPrice());
+            appendString(currency, e.currency());
+            shares.append(e.shares());
+            appendString(action, e.dealType());
+        }
+        return Table.create(
+                "ipo_calendar",
+                symbol,
+                company,
+                exchange,
+                filingDate,
+                date,
+                amendedDate,
+                priceFrom,
+                priceTo,
+                price,
+                currency,
+                shares,
+                action);
+    }
+
+    /**
+     * The economic events calendar as yfinance's {@code Calendars.get_economic_events_calendar()}:
+     * {@code Event}, {@code Region}, {@code Event Time} (an {@link InstantColumn}, since the events
+     * have no exchange zone), {@code For}, {@code Actual}, {@code Expected}, {@code Last}, {@code
+     * Revised}.
+     */
+    public static Table economicEventsToTable(List<EconomicEvent> events) {
+        var event = StringColumn.create("Event");
+        var region = StringColumn.create("Region");
+        var time = InstantColumn.create("Event Time");
+        var period = StringColumn.create("For");
+        var actual = DoubleColumn.create("Actual");
+        var expected = DoubleColumn.create("Expected");
+        var last = DoubleColumn.create("Last");
+        var revised = DoubleColumn.create("Revised");
+        for (EconomicEvent e : events) {
+            event.append(e.event());
+            appendString(region, e.region());
+            time.append(e.time());
+            appendString(period, e.period());
+            actual.append(e.actual());
+            expected.append(e.expected());
+            last.append(e.last());
+            revised.append(e.revised());
+        }
+        return Table.create("economic_events_calendar", event, region, time, period, actual, expected, last, revised);
+    }
+
+    /**
+     * The splits calendar as yfinance's {@code Calendars.get_splits_calendar()}: {@code Symbol},
+     * {@code Company}, {@code Payable On}, {@code Optionable}, {@code Old Share Worth}, {@code Share
+     * Worth}.
+     */
+    public static Table splitsCalendarToTable(List<SplitEvent> events) {
+        var symbol = StringColumn.create("Symbol");
+        var company = StringColumn.create("Company");
+        var payable = DateColumn.create("Payable On");
+        var optionable = BooleanColumn.create("Optionable");
+        var oldWorth = DoubleColumn.create("Old Share Worth");
+        var newWorth = DoubleColumn.create("Share Worth");
+        for (SplitEvent e : events) {
+            symbol.append(e.symbol());
+            appendString(company, e.companyName());
+            payable.append(e.payableDate());
+            if (e.optionable() == null) {
+                optionable.appendMissing();
+            } else {
+                optionable.append(e.optionable());
+            }
+            oldWorth.append(e.oldShareWorth());
+            newWorth.append(e.newShareWorth());
+        }
+        return Table.create("splits_calendar", symbol, company, payable, optionable, oldWorth, newWorth);
+    }
+
     private static <E> DoubleColumn eventColumn(
             String name,
             List<Bar> bars,
@@ -316,6 +464,14 @@ public final class TablesawAdapter {
     }
 
     private static void appendLong(LongColumn column, @Nullable Long value) {
+        if (value == null) {
+            column.appendMissing();
+        } else {
+            column.append(value);
+        }
+    }
+
+    private static void appendDate(DateColumn column, @Nullable LocalDate value) {
         if (value == null) {
             column.appendMissing();
         } else {
