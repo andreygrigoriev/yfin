@@ -3,6 +3,8 @@ package io.andreygrigoriev.yfin.it;
 import io.andreygrigoriev.yfin.Screener;
 import io.andreygrigoriev.yfin.YFinance;
 import io.andreygrigoriev.yfin.internal.http.JdkTransport;
+import io.andreygrigoriev.yfin.request.CalendarRequest;
+import io.andreygrigoriev.yfin.request.EarningsCalendarRequest;
 import io.andreygrigoriev.yfin.request.Frequency;
 import io.andreygrigoriev.yfin.request.HistoryRequest;
 import io.andreygrigoriev.yfin.request.Interval;
@@ -52,6 +54,9 @@ public final class FixtureRecorder implements Transport {
 
     /** Text written in place of a crumb in saved bodies. */
     public static final String CRUMB_PLACEHOLDER = "REDACTED_CRUMB";
+
+    /** Start of a calendar week with no entries, for the {@code *-empty} calendar cases. */
+    private static final LocalDate PAST = LocalDate.of(1970, 1, 1);
 
     /** Built-in cases the CLI can record: a normal, an empty and an error case per endpoint. */
     public static final List<FixtureCase> CASES = List.of(
@@ -135,38 +140,40 @@ public final class FixtureRecorder implements Transport {
             calendarCase(
                     "earnings-week",
                     "earnings calendar, next 7 days, most-active filter",
-                    yf -> RawCalendars.earnings(yf, nextWeek(), nextWeekEnd(), null)),
+                    yf -> yf.earningsCalendar(EarningsCalendarRequest.nextWeek().limit(CalendarRequest.MAX_LIMIT))),
             calendarCase(
                     "earnings-week-mcap",
                     "earnings calendar, next 7 days, market cap >= 1e9, most-active filter",
-                    yf -> RawCalendars.earnings(yf, nextWeek(), nextWeekEnd(), 1e9)),
+                    yf -> yf.earningsCalendar(
+                            EarningsCalendarRequest.nextWeek().marketCap(1e9).limit(CalendarRequest.MAX_LIMIT))),
             calendarCase(
                     "earnings-empty",
                     "earnings calendar, a week in 1970",
-                    yf -> RawCalendars.earnings(yf, RawCalendars.PAST_START, RawCalendars.PAST_END, null)),
-            calendarCase("ipo-week", "IPO calendar, next 7 days", yf -> RawCalendars.ipos(nextWeek(), nextWeekEnd())),
+                    yf -> yf.earningsCalendar(EarningsCalendarRequest.from(PAST).limit(CalendarRequest.MAX_LIMIT))),
+            calendarCase(
+                    "ipo-week",
+                    "IPO calendar, next 7 days",
+                    yf -> yf.ipoCalendar(CalendarRequest.nextWeek().limit(CalendarRequest.MAX_LIMIT))),
             calendarCase(
                     "ipo-empty",
                     "IPO calendar, a week in 1970",
-                    yf -> RawCalendars.ipos(RawCalendars.PAST_START, RawCalendars.PAST_END)),
+                    yf -> yf.ipoCalendar(CalendarRequest.from(PAST).limit(CalendarRequest.MAX_LIMIT))),
             calendarCase(
                     "economic-week",
                     "economic events calendar, next 7 days",
-                    yf -> RawCalendars.economicEvents(nextWeek(), nextWeekEnd())),
+                    yf -> yf.economicEventsCalendar(CalendarRequest.nextWeek().limit(CalendarRequest.MAX_LIMIT))),
             calendarCase(
                     "economic-empty",
                     "economic events calendar, a week in 1970",
-                    yf -> RawCalendars.economicEvents(RawCalendars.PAST_START, RawCalendars.PAST_END)),
+                    yf -> yf.economicEventsCalendar(CalendarRequest.from(PAST).limit(CalendarRequest.MAX_LIMIT))),
             calendarCase(
                     "splits-week",
                     "splits calendar, next 7 days",
-                    yf -> RawCalendars.splits(nextWeek(), nextWeekEnd())),
+                    yf -> yf.splitsCalendar(CalendarRequest.nextWeek().limit(CalendarRequest.MAX_LIMIT))),
             calendarCase(
                     "splits-empty",
                     "splits calendar, a week in 1970",
-                    yf -> RawCalendars.splits(RawCalendars.PAST_START, RawCalendars.PAST_END)),
-            calendarCase(
-                    "error", "unknown query operator (error envelope)", yf -> RawCalendars.badOperator(nextWeek())),
+                    yf -> yf.splitsCalendar(CalendarRequest.from(PAST).limit(CalendarRequest.MAX_LIMIT))),
             new FixtureCase(
                     "aapl",
                     "AAPL full shares history",
@@ -230,17 +237,12 @@ public final class FixtureRecorder implements Transport {
         return recording.write();
     }
 
-    // TODO(market calendars, Task 8): replace with cases calling the public calendar API.
+    /**
+     * Calendar case recording only the visualization response; the most-active screener request of
+     * the earnings calendar is not saved (see the {@code most-actives} case).
+     */
     private static FixtureCase calendarCase(String name, String description, Consumer<YFinance> action) {
         return new FixtureCase(name, description, Map.of("visualization", "calendar"), action);
-    }
-
-    private static LocalDate nextWeek() {
-        return LocalDate.now();
-    }
-
-    private static LocalDate nextWeekEnd() {
-        return nextWeek().plusDays(7);
     }
 
     /** Endpoint directory for {@code request}, or {@code null} for session and unknown traffic. */
@@ -439,7 +441,6 @@ public final class FixtureRecorder implements Transport {
         }
         try (JdkTransport jdk = JdkTransport.create()) {
             var recorder = new FixtureRecorder(jdk, root);
-            RawCalendars.use(recorder);
             try (YFinance client = YFinance.builder()
                     .transport(recorder)
                     .cache(Cache.none())

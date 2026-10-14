@@ -288,8 +288,7 @@ class FixtureRecorderTest {
                         "calendar/economic-week",
                         "calendar/economic-empty",
                         "calendar/splits-week",
-                        "calendar/splits-empty",
-                        "calendar/error")))
+                        "calendar/splits-empty")))
                 .allSatisfy(c -> assertThat(c.endpoints()).containsExactly(Map.entry("visualization", "calendar")));
         assertThat(FixtureRecorder.select(List.of("calendar/most-actives")))
                 .singleElement()
@@ -297,40 +296,34 @@ class FixtureRecorderTest {
     }
 
     @Test
-    void calendarCasePostsTheYfinanceBodyAndRecordsIntoCalendar() throws IOException {
+    void calendarCaseCallsThePublicApiAndRecordsIntoCalendar() throws IOException {
         fake.onPost("/v1/finance/visualization").respondFixture("calendar/splits-week.json");
-        RawCalendars.use(recorder);
 
         List<Path> written = recorder.record(
                 FixtureRecorder.select(List.of("calendar/splits-week")).getFirst(), yf, log);
 
         assertThat(written).containsExactly(root.resolve("calendar/splits-week.json"));
+        assertThat(logBytes.toString(StandardCharsets.UTF_8)).isEmpty();
         HttpRequest post = fake.requests().stream()
                 .filter(r -> r.method().equals("POST"))
                 .findFirst()
                 .orElseThrow();
-        assertThat(FakeTransport.parseQuery(post.uri().getRawQuery()))
-                .containsEntry("lang", List.of("en-US"))
-                .containsEntry("region", List.of("US"))
-                .containsKey("crumb");
         JsonNode body = YahooJson.mapper().readTree(post.bodyAsString().orElseThrow());
         assertThat(body.path("entityIdType").asText()).isEqualTo("splits");
-        assertThat(body.path("sortField").asText()).isEqualTo("startdatetime");
+        assertThat(body.path("size").asInt()).isEqualTo(100);
         assertThat(body.path("query").path("operator").asText()).isEqualTo("AND");
-        assertThat(body.path("query").path("operands").path(0).path("operator").asText())
-                .isEqualTo("GTE");
     }
 
     @Test
-    void earningsCalendarCaseFiltersMostActiveByMarketCap() throws IOException {
+    void earningsCalendarCaseRecordsOnlyTheVisualizationResponse() throws IOException {
         fake.onGet("/v1/finance/screener/predefined/saved").respondFixture("calendar/most-actives.json");
         fake.onPost("/v1/finance/visualization").respondFixture("calendar/earnings-week-mcap.json");
-        RawCalendars.use(recorder);
 
         List<Path> written = recorder.record(
                 FixtureRecorder.select(List.of("calendar/earnings-week-mcap")).getFirst(), yf, log);
 
         assertThat(written).containsExactly(root.resolve("calendar/earnings-week-mcap.json"));
+        assertThat(logBytes.toString(StandardCharsets.UTF_8)).isEmpty();
         HttpRequest post = fake.requests().stream()
                 .filter(r -> r.uri().getPath().equals("/v1/finance/visualization"))
                 .findFirst()
@@ -340,10 +333,27 @@ class FixtureRecorderTest {
                 .path("query")
                 .path("operands");
         assertThat(operands.path(4).path("operands").path(1).asDouble()).isEqualTo(1e9);
-        JsonNode tickers = operands.path(5).path("operands");
-        assertThat(tickers.size()).isPositive();
-        assertThat(tickers.path(0).path("operator").asText()).isEqualTo("EQ");
-        assertThat(tickers.path(0).path("operands").path(0).asText()).isEqualTo("ticker");
+        assertThat(operands.path(5).path("operands").size()).isPositive();
+    }
+
+    @Test
+    void emptyCalendarCaseUsesAWeekIn1970() throws IOException {
+        fake.onPost("/v1/finance/visualization").respondFixture("calendar/ipo-empty.json");
+
+        recorder.record(FixtureRecorder.select(List.of("calendar/ipo-empty")).getFirst(), yf, log);
+
+        HttpRequest post = fake.requests().stream()
+                .filter(r -> r.method().equals("POST"))
+                .findFirst()
+                .orElseThrow();
+        JsonNode window = YahooJson.mapper()
+                .readTree(post.bodyAsString().orElseThrow())
+                .path("query")
+                .path("operands")
+                .path(0)
+                .path("operands");
+        assertThat(window.path(1).asText()).isEqualTo("1970-01-01");
+        assertThat(window.path(2).asText()).isEqualTo("1970-01-08");
     }
 
     private static String endpoint(String uri) {

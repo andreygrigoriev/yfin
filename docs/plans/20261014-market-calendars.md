@@ -306,11 +306,12 @@
 - Modify: `yfin-it/src/main/java/io/andreygrigoriev/yfin/it/FixtureRecorder.java`
 - Modify: `yfin-it/src/test/java/io/andreygrigoriev/yfin/it/FixtureRecorderTest.java`
 
-- [ ] replace the temporary Task 1 recorder cases with cases calling the public API (`yf.earningsCalendar(...)` etc.), keeping the same fixture names
-- [ ] ➕ delete the temporary `yfin-it/.../RawCalendars.java` (Task 1 raw-body poster) and its two `FixtureRecorderTest` tests; the error case can stay raw (no public API sends an unknown operator) or be dropped
-- [ ] `CalendarsIT` (`-Plive`): each calendar over a 14-day window returns records with non-null key fields; earnings sorted descending; `limit(5)` gives at most 5 rows. Assert shape only; IPO/splits may legitimately be empty
-- [ ] update `FixtureRecorderTest` for the final cases
-- [ ] run `./mvnw verify` and `./mvnw -Plive verify` - must pass before task 9
+- [x] replace the temporary Task 1 recorder cases with cases calling the public API (`yf.earningsCalendar(...)` etc.), keeping the same fixture names
+- [x] ➕ delete the temporary `yfin-it/.../RawCalendars.java` (Task 1 raw-body poster) and its two `FixtureRecorderTest` tests; the error case can stay raw (no public API sends an unknown operator) or be dropped
+  - dropped: `calendar/error.json` stays as recorded in Task 1, but no recorder case re-records it
+- [x] `CalendarsIT` (`-Plive`): each calendar over a 14-day window returns records with non-null key fields; earnings sorted descending; `limit(5)` gives at most 5 rows. Assert shape only; IPO/splits may legitimately be empty
+- [x] update `FixtureRecorderTest` for the final cases
+- [x] run `./mvnw verify` and `./mvnw -Plive verify` - must pass before task 9
 
 ### Task 9: Verify acceptance criteria
 - [ ] verify all four calendars, default windows, limit/offset, the market-cap and most-active filters are implemented
