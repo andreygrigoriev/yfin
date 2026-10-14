@@ -249,6 +249,23 @@ Set<String> predefined = Screener.predefinedNames();
 Map<String, Set<String>> fields = EquityQuery.validFields();   // FundQuery, EtfQuery likewise
 ```
 
+### Market calendars
+
+```java
+List<EarningsEvent> earnings = yf.earningsCalendar();      // today..+7 days, 12 rows, most-active filter on
+List<EarningsEvent> bigCaps = yf.earningsCalendar(EarningsCalendarRequest
+        .between(LocalDate.of(2026, 10, 19), LocalDate.of(2026, 10, 23))
+        .marketCap(1e9)
+        .filterMostActive(false)
+        .limit(50));
+List<IpoEvent> ipos = yf.ipoCalendar(CalendarRequest.from(LocalDate.now()).limit(100));
+List<EconomicEvent> econ = yf.economicEventsCalendar();
+List<SplitEvent> splits = yf.splitsCalendar(CalendarRequest.between(start, end));
+```
+
+Every call makes its own request(s); nothing is cached. `limit` must be in `1..100`; page with
+`offset(n)`. Earnings are sorted by start time, newest first, with times in `America/New_York`.
+
 ### Sector, industry, market
 
 ```java
@@ -289,6 +306,7 @@ Table options = TablesawAdapter.optionsToTable(chain.calls());
 
 DataFrame df = DFLibAdapter.toDataFrame(msft.history(Period.ONE_YEAR));
 DataFrame holders = DFLibAdapter.holdersToDataFrame(msft.institutionalHolders());
+DataFrame ipoFrame = DFLibAdapter.ipoCalendarToDataFrame(yf.ipoCalendar());
 ```
 
 ### Errors
@@ -375,6 +393,8 @@ This replaces yfinance's `enable_debug_mode()`. For example, with Logback:
 | `EquityQuery`, `FundQuery` | `EquityQuery`, `FundQuery`, `EtfQuery` (same operators, `validFields()`, `validValues()`) |
 | `yf.Sector(key)`, `yf.Industry(key)` | `yf.sector(key)`, `yf.industry(key)` |
 | `yf.Market(region)` → `status`, `summary` | `yf.market(MarketRegion)` → `status()`, `summary()` |
+| `yf.Calendars(start, end).get_earnings_calendar(market_cap=, filter_most_active=, limit=, offset=)` | `yf.earningsCalendar(EarningsCalendarRequest.between(start, end).marketCap(...).filterMostActive(...).limit(n).offset(n))` |
+| `Calendars.get_ipo_info_calendar`, `get_economic_events_calendar`, `get_splits_calendar` | `yf.ipoCalendar(CalendarRequest)`, `yf.economicEventsCalendar(CalendarRequest)`, `yf.splitsCalendar(CalendarRequest)` |
 | `yf.WebSocket` | `YFinanceLive.connect(yf, listener)` (`yfin-live`) |
 | `yf.set_config(proxy=, retries=)`, `set_tz_cache_location` | `YFinance.builder().proxy(...).maxRetries(...).cacheDir(...)` |
 | `yf.enable_debug_mode()` | SLF4J logger levels |
@@ -383,7 +403,13 @@ This replaces yfinance's `enable_debug_mode()`. For example, with Logback:
 
 | yfinance | Status in yfin |
 |---|---|
-| `Calendars` (market-wide earnings, IPO, economic-events and splits calendars) | not ported in v1. It is a separate feature with its own query DSL and four result shapes. A candidate for a later release. |
+| `Calendars` caching and `force=` | stateless: every call makes its own request(s), and the most-active symbol list is not cached. |
+| `Calendars(start=None or end=None)` | the window is always complete: `between(start, end)` (rejects `end < start`), `from(start)` (7 days) or `nextWeek()`. |
+| `Calendars` `limit > 100` | rejected with `IllegalArgumentException`; yfinance silently caps it at 100. |
+| `filter_most_active` with no surviving symbol | an empty list, without querying the calendar. yfinance sends an empty `OR`. |
+| `filter_most_active` screener failure | the screener exception propagates. yfinance logs it and continues unfiltered. |
+| economic events `Date` column | `EconomicEvent.time` is an `Instant`, because the events aren't tied to an exchange. |
+| earnings calendar `Event Start Date` | `EarningsEvent.startTime` is a `ZonedDateTime` in `America/New_York` (the query is `region = us`). |
 | `Auth.set_login_cookies` (Yahoo account cookies) | not ported, because it needs account credentials. A custom `Transport` can add cookies. |
 | `earnings`, `quarterly_earnings`, `get_earnings` | deprecated upstream and always `None` there. Use `incomeStatement(...).get(LineItem.NET_INCOME)`. |
 | `get_shares` | raises `YFNotImplementedError` upstream. Use `sharesFull()`. |

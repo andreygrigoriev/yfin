@@ -323,9 +323,9 @@
 - [x] verify coverage of `CalendarEndpoint`/`VisualizationTable` is comparable to the other endpoints
 
 ### Task 10: [Final] Update documentation
-- [ ] README: a usage section for calendars (example from Solution Overview); move `Calendars` from "Not ported" to the mapping table (`Calendars.get_*_calendar` → `yf.*Calendar(...)`); add "different on purpose" rows: stateless (no `force`/cache), the window is always complete, `limit` validated not capped, empty result when no most-active symbol survives, screener errors propagate, `EconomicEvent.time` is an `Instant`, earnings times are in `America/New_York`
-- [ ] CLAUDE.md: mention the shared `internal.endpoint.visualization` layer under Layout
-- [ ] move this plan to `docs/plans/completed/`
+- [x] README: a usage section for calendars (example from Solution Overview); move `Calendars` from "Not ported" to the mapping table (`Calendars.get_*_calendar` → `yf.*Calendar(...)`); add "different on purpose" rows: stateless (no `force`/cache), the window is always complete, `limit` validated not capped, empty result when no most-active symbol survives, screener errors propagate, `EconomicEvent.time` is an `Instant`, earnings times are in `America/New_York`
+- [x] CLAUDE.md: mention the shared `internal.endpoint.visualization` layer under Layout
+- [x] move this plan to `docs/plans/completed/`
 
 ## Post-Completion
 *Items requiring manual intervention or external systems - no checkboxes, informational only*

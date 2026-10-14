@@ -28,6 +28,9 @@ Always use the wrapper (`./mvnw`), never a bare `mvn`.
 - `yfin-core`: module `io.andreygrigoriev.yfin`. It exports only `yfin`, `yfin.model`,
   `yfin.request`, `yfin.spi` and `yfin.exception`. `BuildSmokeTest` asserts this. Everything in
   `yfin.internal.*` (`http`, `endpoint.<name>`, `cache`, `repair`) is private.
+- `internal.endpoint.visualization` is the shared layer for Yahoo's `/v1/finance/visualization`
+  POST (`VisualizationEndpoint`, `VisualizationQuery`, `VisualizationTable`). Earnings dates and
+  the market calendars build on it; map cells by column id, never by position.
 - `yfin-live`: WebSocket streaming. It vendors `pricing.proto`, compiled by the ascopes protobuf
   plugin. It opens `internal.proto` only to protobuf.
 - `yfin-tablesaw`, `yfin-dflib`: static adapters (`TablesawAdapter`, `DFLibAdapter`). These are
