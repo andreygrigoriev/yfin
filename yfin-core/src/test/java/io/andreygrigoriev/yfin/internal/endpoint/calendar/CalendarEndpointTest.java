@@ -22,7 +22,6 @@ import io.andreygrigoriev.yfin.spi.Cache;
 import io.andreygrigoriev.yfin.spi.HttpRequest;
 import io.andreygrigoriev.yfin.testing.FakeTransport;
 import java.io.IOException;
-import java.io.InputStream;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZonedDateTime;
@@ -465,8 +464,10 @@ class CalendarEndpointTest {
     }
 
     private static JsonNode fixture(String name) {
-        try (InputStream in = CalendarEndpointTest.class.getResourceAsStream("/fixtures/" + name)) {
-            return YahooJson.mapper().readTree(in);
+        // from the file system, like FakeTransport: the native test image has no fixture resources
+        try {
+            return YahooJson.mapper()
+                    .readTree(FakeTransport.DEFAULT_FIXTURE_ROOT.resolve(name).toFile());
         } catch (IOException e) {
             throw new AssertionError(e);
         }

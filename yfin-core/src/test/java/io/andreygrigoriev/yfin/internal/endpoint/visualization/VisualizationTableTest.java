@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.andreygrigoriev.yfin.exception.YFDataException;
 import io.andreygrigoriev.yfin.internal.http.YahooJson;
+import io.andreygrigoriev.yfin.testing.FakeTransport;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -135,10 +136,11 @@ class VisualizationTableTest {
 
     @Test
     void readsRecordedFixture() throws Exception {
-        JsonNode root;
-        try (var in = getClass().getResourceAsStream("/fixtures/calendar/economic-week.json")) {
-            root = YahooJson.mapper().readTree(in);
-        }
+        // from the file system, like FakeTransport: the native test image has no fixture resources
+        JsonNode root = YahooJson.mapper()
+                .readTree(FakeTransport.DEFAULT_FIXTURE_ROOT
+                        .resolve("calendar/economic-week.json")
+                        .toFile());
         VisualizationTable table = VisualizationTable.of(root);
 
         assertThat(table.isEmpty()).isFalse();

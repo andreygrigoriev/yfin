@@ -314,12 +314,13 @@
 - [x] run `./mvnw verify` and `./mvnw -Plive verify` - must pass before task 9
 
 ### Task 9: Verify acceptance criteria
-- [ ] verify all four calendars, default windows, limit/offset, the market-cap and most-active filters are implemented
-- [ ] verify edge cases: empty windows, error envelope, missing cells, zero placeholders, no most-active survivors
-- [ ] run full test suite: `./mvnw verify`
-- [ ] run native tests: `JAVA_HOME=~/.sdkman/candidates/java/25-graal ./mvnw -Pnative test`
-- [ ] run live ITs: `./mvnw -Plive verify`
-- [ ] verify coverage of `CalendarEndpoint`/`VisualizationTable` is comparable to the other endpoints
+- [x] verify all four calendars, default windows, limit/offset, the market-cap and most-active filters are implemented
+- [x] verify edge cases: empty windows, error envelope, missing cells, zero placeholders, no most-active survivors
+- [x] run full test suite: `./mvnw verify`
+- [x] run native tests: `JAVA_HOME=~/.sdkman/candidates/java/25-graal ./mvnw -Pnative test`
+  - ➕ fixed: `CalendarEndpointTest`/`VisualizationTableTest` read fixtures as classpath resources, which the native test image lacks; they now read from `FakeTransport.DEFAULT_FIXTURE_ROOT` like `FakeTransport`
+- [x] run live ITs: `./mvnw -Plive verify`
+- [x] verify coverage of `CalendarEndpoint`/`VisualizationTable` is comparable to the other endpoints
 
 ### Task 10: [Final] Update documentation
 - [ ] README: a usage section for calendars (example from Solution Overview); move `Calendars` from "Not ported" to the mapping table (`Calendars.get_*_calendar` → `yf.*Calendar(...)`); add "different on purpose" rows: stateless (no `force`/cache), the window is always complete, `limit` validated not capped, empty result when no most-active symbol survives, screener errors propagate, `EconomicEvent.time` is an `Instant`, earnings times are in `America/New_York`
