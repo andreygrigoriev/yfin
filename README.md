@@ -1,25 +1,78 @@
+<div align="center">
+
 # yfin
 
-Java 25 port of [yfinance](https://github.com/ranaroussi/yfinance): a Yahoo Finance market data client.
+**Yahoo Finance market data for Java 25: a port of [yfinance](https://github.com/ranaroussi/yfinance).**
 
-yfin covers what yfinance does: price history with price repair, quote and company info, financial
-statements, holders, analyst data, earnings, options, news, bulk download, search and lookup,
-screeners, sectors, industries, market summaries and live streaming. You create a client, the calls
-block (use virtual threads for concurrency), and results come back as immutable records.
-DataFrame adapters for Tablesaw and DFLib are optional.
+[![Maven Central](https://img.shields.io/maven-central/v/io.andreygrigoriev/yfin-core?label=Maven%20Central&color=blue)](https://central.sonatype.com/artifact/io.andreygrigoriev/yfin-core)
+[![Javadoc](https://javadoc.io/badge2/io.andreygrigoriev/yfin-core/javadoc.svg)](https://javadoc.io/doc/io.andreygrigoriev/yfin-core)
+[![CI](https://github.com/andreygrigoriev/yfin/actions/workflows/ci.yml/badge.svg)](https://github.com/andreygrigoriev/yfin/actions/workflows/ci.yml)
+[![Nightly live](https://github.com/andreygrigoriev/yfin/actions/workflows/nightly-live.yml/badge.svg)](https://github.com/andreygrigoriev/yfin/actions/workflows/nightly-live.yml)
+<br>
+[![Java 25](https://img.shields.io/badge/Java-25-orange?logo=openjdk)](https://openjdk.org/projects/jdk/25/)
+[![GraalVM native image](https://img.shields.io/badge/GraalVM-native%20image%20ready-0b7285?logo=oracle)](#graalvm-native-image)
+[![yfinance parity](https://img.shields.io/badge/yfinance-1.7.0-informational)](#yfinance--yfin-mapping)
+[![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
 
-Reference version: yfinance 1.7.0 (see `NOTICE`).
+[Install](#install) · [Quickstart](#quickstart) · [Examples](#examples) ·
+[yfinance mapping](#yfinance--yfin-mapping) · [Contributing](CONTRIBUTING.md)
 
-> **Disclaimer.** yfin is not affiliated with, endorsed by, or vetted by Yahoo, Inc. It uses
-> Yahoo's publicly available endpoints, which are undocumented and can change without notice.
-> Yahoo Finance data is for personal use only. You are responsible for following
+</div>
+
+yfin covers what yfinance does. You create one client, the calls block (use virtual threads for
+concurrency), and results come back as immutable records. DataFrame adapters for Tablesaw and DFLib
+are optional. The reference version is yfinance 1.7.0 (see [`NOTICE`](NOTICE)).
+
+> [!WARNING]
+> yfin is not affiliated with, endorsed by, or vetted by Yahoo, Inc. It uses Yahoo's publicly
+> available endpoints, which are undocumented and can change without notice. Yahoo Finance data is
+> for personal use only. You are responsible for following
 > [Yahoo's terms of use](https://legal.yahoo.com/us/en/yahoo/terms/otos/index.html). Use yfin for
 > personal and research use only.
 
+## Features
+
+| | Area | What you get |
+|---|---|---|
+| 📈 | [Price history](#price-history) | OHLCV bars for any period or interval, dividends, splits, optional price repair |
+| 🏢 | [Info](#info-and-fast-info) | company profile, quote snapshot, cheap `fastInfo()`, ISIN |
+| 📊 | [Financials](#financial-statements-and-valuation) | income statement, balance sheet, cash flow (annual, quarterly, TTM), valuation |
+| 👥 | [Holders and analysts](#holders-analysts-earnings-calendar) | institutional and insider holders, recommendations, price targets, estimates |
+| 🔗 | [Options](#options) | expirations and full option chains |
+| 📰 | [News](#news-and-shares) | news and press releases, share count history |
+| 📦 | [Bulk download](#bulk-download-and-tickers) | many symbols at once, with partial results on failure |
+| 🔎 | [Search and screener](#search-and-lookup) | search, lookup by type, predefined and custom screeners |
+| 🗓️ | [Market calendars](#market-calendars) | earnings, IPO, economic events and splits calendars |
+| 🌍 | [Sectors and markets](#sector-industry-market) | sector and industry leaders, market status and summary |
+| ⚡ | [Live streaming](#live-streaming-yfin-live) | WebSocket price ticks with automatic reconnect |
+| 🧮 | [DataFrames](#dataframes-yfin-tablesaw-yfin-dflib) | Tablesaw `Table` and DFLib `DataFrame` conversions |
+
+It is also built for production use: one thread-safe client with no global state, a client-wide
+concurrency limit with retries and backoff, a pluggable HTTP transport, JPMS modules, and
+[GraalVM native image](#graalvm-native-image) support without extra flags.
+
+<details>
+<summary><b>Table of contents</b></summary>
+
+- [Install](#install)
+- [Quickstart](#quickstart)
+- [Configuration](#configuration)
+- [Data conventions](#data-conventions)
+- [Examples](#examples)
+- [Errors](#errors)
+- [Rate limits](#rate-limits)
+- [Logging](#logging)
+- [yfinance → yfin mapping](#yfinance--yfin-mapping)
+- [GraalVM native image](#graalvm-native-image)
+- [Contributing](#contributing)
+- [License](#license)
+
+</details>
+
 ## Install
 
-All modules are published to Maven Central under `io.andreygrigoriev` and are released together,
-with one shared version. They need Java 25.
+All modules are published to Maven Central under `io.andreygrigoriev`. They are released together
+with one shared version, and they need Java 25.
 
 | Artifact | JPMS module | Contents | Extra dependencies |
 |---|---|---|---|
@@ -28,7 +81,18 @@ with one shared version. They need Java 25.
 | `yfin-tablesaw` | `io.andreygrigoriev.yfin.tablesaw` | records → Tablesaw `Table` | tablesaw-core |
 | `yfin-dflib` | `io.andreygrigoriev.yfin.dflib` | records → DFLib `DataFrame` | dflib |
 
-Maven:
+```mermaid
+flowchart LR
+    app([Your app]) --> core
+    app -. optional .-> live & tablesaw & dflib
+    live[yfin-live] --> core[yfin-core]
+    tablesaw[yfin-tablesaw] --> core
+    dflib[yfin-dflib] --> core
+    core --> yahoo[(Yahoo Finance)]
+    live -- wss --> yahoo
+```
+
+**Maven**
 
 ```xml
 <dependency>
@@ -44,7 +108,7 @@ Maven:
 </dependency>
 ```
 
-Gradle (Kotlin DSL):
+**Gradle (Kotlin DSL)**
 
 ```kotlin
 dependencies {
@@ -56,10 +120,9 @@ dependencies {
 }
 ```
 
-On the module path, add `requires io.andreygrigoriev.yfin;` (or the `.live`, `.tablesaw` or
-`.dflib` module, which each re-export core). Core exports only `io.andreygrigoriev.yfin`,
-`…yfin.model`, `…yfin.request`, `…yfin.spi` and `…yfin.exception`. Everything under
-`…yfin.internal` is private.
+**Module path.** Add `requires io.andreygrigoriev.yfin;`, or the `.live`, `.tablesaw` or `.dflib`
+module, each of which re-exports core. Core exports only `io.andreygrigoriev.yfin`, `…yfin.model`,
+`…yfin.request`, `…yfin.spi` and `…yfin.exception`. Everything under `…yfin.internal` is private.
 
 ## Quickstart
 
@@ -82,9 +145,12 @@ try (YFinance yf = YFinance.create()) {
 }
 ```
 
-`YFinance` is thread-safe and holds the HTTP client, the Yahoo session (cookie and crumb) and the
-cache. Create one, share it, and close it when you are done. A `Ticker` is a lightweight handle
-with no state: each call sends a new request.
+> [!TIP]
+> `YFinance` is thread-safe and holds the HTTP client, the Yahoo session (cookie and crumb) and the
+> cache. Create one, share it, and close it when you are done. A `Ticker` is a lightweight handle
+> with no state: each call sends a new request.
+
+## Configuration
 
 Configuration goes through the builder:
 
@@ -101,24 +167,31 @@ YFinance yf = YFinance.builder()
         .build();
 ```
 
-`Transport` (`io.andreygrigoriev.yfin.spi`) is a public SPI for the HTTP layer: pass your own with
-`.transport(myTransport)` to change TLS, add logging or headers, or stub Yahoo in tests. With a
-custom transport, `proxy`, `connectTimeout`, `requestTimeout` and `userAgent` are ignored, since
-they configure the default JDK transport. A transport that manages cookies itself (or wraps one
-that does) should return its store from `Transport.cookieStore()`; otherwise yfin keeps the Yahoo
-cookies and sends the `Cookie` header itself.
+**Custom transport.** `Transport` (`io.andreygrigoriev.yfin.spi`) is a public SPI for the HTTP
+layer. Pass your own with `.transport(myTransport)` to change TLS, add logging or headers, or stub
+Yahoo in tests.
 
-Data conventions:
-- Time-series prices are `double`. A missing value is `Double.NaN`. A missing volume is `0`.
-- Scalar snapshot fields such as `TickerInfo`, `FastInfo` and analyst targets are boxed and
-  `@Nullable`.
-- Bars and events use `ZonedDateTime` in the exchange time zone. Statement periods and calendar
-  dates use `LocalDate`.
-- Collections are unmodifiable. When Yahoo has no data, the result is an empty list or
-  `Optional.empty()`, not an exception.
-- Semi-structured records have a `raw()` map that holds the full Yahoo payload.
+> [!NOTE]
+> With a custom transport, `proxy`, `connectTimeout`, `requestTimeout` and `userAgent` are ignored,
+> since they configure the default JDK transport. A transport that manages cookies itself (or wraps
+> one that does) should return its store from `Transport.cookieStore()`. Otherwise yfin keeps the
+> Yahoo cookies and sends the `Cookie` header itself.
+
+## Data conventions
+
+| Kind of value | Representation |
+|---|---|
+| Time-series prices | `double`; a missing value is `Double.NaN`, a missing volume is `0` |
+| Scalar snapshot fields (`TickerInfo`, `FastInfo`, analyst targets) | boxed and `@Nullable` |
+| Bar and event times | `ZonedDateTime` in the exchange time zone |
+| Statement periods and calendar dates | `LocalDate` |
+| Collections | unmodifiable |
+| No data from Yahoo | an empty list or `Optional.empty()`, not an exception |
+| Semi-structured records | a `raw()` map with the full Yahoo payload |
 
 ## Examples
+
+The snippets below share a client `yf` and the `msft` ticker from the first one.
 
 ### Price history
 
@@ -223,8 +296,9 @@ Map<String, PriceHistory> history = tickers.history(Period.ONE_MONTH);
 Map<String, List<NewsItem>> news = tickers.news();
 ```
 
-`download` is strict. If any symbol fails, it throws `YFDownloadException`, and the exception
-carries the successful results.
+> [!IMPORTANT]
+> `download` is strict. If any symbol fails, it throws `YFDownloadException`, and the exception
+> carries the successful results.
 
 ### Search and lookup
 
@@ -309,7 +383,7 @@ DataFrame holders = DFLibAdapter.holdersToDataFrame(msft.institutionalHolders())
 DataFrame ipoFrame = DFLibAdapter.ipoCalendarToDataFrame(yf.ipoCalendar());
 ```
 
-### Errors
+## Errors
 
 Every exception is unchecked and extends `YFinanceException`:
 
@@ -327,27 +401,37 @@ Every exception is unchecked and extends `YFinanceException`:
 Yahoo throttles heavy clients with HTTP 429, and sometimes with a temporary block. yfin limits the
 load it sends:
 
-- At most `maxConcurrentRequests` requests are in flight at once (default 8). This applies to the
-  whole client, including `download` and `Tickers`.
-- 429 and 5xx responses are retried with exponential backoff and full jitter (base 1 s), up to
-  `maxRetries` times (default 2). A `Retry-After` header is honored, capped at the maximum delay.
-  When retries run out, you get `YFRateLimitException` or `YFTransportException`.
-- The cookie and crumb are cached (`~/.cache/yfin`, or `$XDG_CACHE_HOME/yfin`). Only one thread
-  fetches them at a time, and they are refreshed once on 401 or "Invalid Crumb". Exchange time
-  zones and ISINs are cached too, which saves requests.
+- **Concurrency.** At most `maxConcurrentRequests` requests are in flight at once (default 8). This
+  applies to the whole client, including `download` and `Tickers`.
+- **Retries.** 429 and 5xx responses are retried with exponential backoff and full jitter (base
+  1 s), up to `maxRetries` times (default 2). A `Retry-After` header is honored, capped at the
+  maximum delay. When retries run out, you get `YFRateLimitException` or `YFTransportException`.
+- **Caching.** The cookie and crumb are cached (`~/.cache/yfin`, or `$XDG_CACHE_HOME/yfin`). Only
+  one thread fetches them at a time, and they are refreshed once on 401 or "Invalid Crumb".
+  Exchange time zones and ISINs are cached too, which saves requests.
 
 Recommendations:
+
 - Use one shared `YFinance` instance. Several instances each have their own limit and session.
 - For hundreds of symbols, lower `maxConcurrentRequests` (2 to 4), spread the work over time, and
   catch `YFRateLimitException` to back off at the application level.
 - `fastInfo()` is cheaper than `info()`, which makes three requests.
-- If Yahoo blocks your IP, wait. Retrying immediately makes the block last longer.
+
+> [!CAUTION]
+> If Yahoo blocks your IP, wait. Retrying immediately makes the block last longer.
 
 ## Logging
 
 yfin logs through the SLF4J 2.x API and ships no binding. Add one (Logback, `slf4j-simple`,
 `log4j-slf4j2-impl`, …) to see the logs. Without a binding, SLF4J prints one warning and drops all
-messages. Logger names are class names under `io.andreygrigoriev.yfin`:
+messages. This replaces yfinance's `enable_debug_mode()`. For example, with Logback:
+
+```xml
+<logger name="io.andreygrigoriev.yfin" level="DEBUG"/>
+```
+
+<details>
+<summary><b>Logger names</b> (class names under <code>io.andreygrigoriev.yfin</code>)</summary>
 
 | Logger | What it logs |
 |---|---|
@@ -358,13 +442,29 @@ messages. Logger names are class names under `io.andreygrigoriev.yfin`:
 | `io.andreygrigoriev.yfin.internal.cache.FileCache` | cache file read/write problems (warn; the cache then ignores the file) |
 | `io.andreygrigoriev.yfin.live.LiveStream` | connect, reconnect, decode errors |
 
-This replaces yfinance's `enable_debug_mode()`. For example, with Logback:
-
-```xml
-<logger name="io.andreygrigoriev.yfin" level="DEBUG"/>
-```
+</details>
 
 ## yfinance → yfin mapping
+
+Coming from Python? Most names translate directly: snake_case properties become camelCase methods,
+and keyword arguments become request builders.
+
+```python
+# yfinance
+t = yf.Ticker("AAPL")
+t.history(period="1mo", interval="1d")
+t.quarterly_income_stmt
+```
+
+```java
+// yfin
+Ticker t = yf.ticker("AAPL");
+t.history(HistoryRequest.of(Period.ONE_MONTH, Interval.ONE_DAY));
+t.incomeStatement(Frequency.QUARTERLY);
+```
+
+<details>
+<summary><b>Full API mapping</b></summary>
 
 | yfinance | yfin |
 |---|---|
@@ -399,7 +499,12 @@ This replaces yfinance's `enable_debug_mode()`. For example, with Logback:
 | `yf.set_config(proxy=, retries=)`, `set_tz_cache_location` | `YFinance.builder().proxy(...).maxRetries(...).cacheDir(...)` |
 | `yf.enable_debug_mode()` | SLF4J logger levels |
 
+</details>
+
 ### Not ported, or different on purpose
+
+<details>
+<summary><b>Intentional differences from yfinance</b></summary>
 
 | yfinance | Status in yfin |
 |---|---|
@@ -424,22 +529,34 @@ This replaces yfinance's `enable_debug_mode()`. For example, with Logback:
 | unknown symbol on statements | empty `FinancialStatement`, not an exception. Yahoo answers the same way as for ETFs. |
 | `fundsData()` on a non-fund | `Optional.empty()` instead of an exception |
 
+</details>
+
 ## GraalVM native image
 
 Applications using yfin can be compiled into native executables. You don't need extra
 `native-image` flags, `--enable-url-protocols`, or your own reachability metadata. Each module
 ships its metadata at `META-INF/native-image/io.andreygrigoriev/<artifactId>/reachability-metadata.json`.
+
+| Module | Native status | Notes |
+|---|---|---|
+| `yfin-core` | ✅ supported | JSON goes through the Jackson tree model, so no reflection metadata is needed. The JDK `HttpClient` over HTTPS works with no flags. |
+| `yfin-live` | ✅ supported | Protobuf `PricingData` decoding and the JDK `WebSocket` (`wss://`) work. The metadata registers protobuf-java's reflective `ExtensionRegistry` lookup. |
+| `yfin-tablesaw` | ⚠️ best effort | Tablesaw's `Table` runs a ClassGraph classpath scan in its static initializer; the shipped metadata lets that scan run. In a native image the scan finds no Tablesaw readers or writers, which the adapter does not use. Tablesaw's own CSV and other I/O is not covered. |
+| `yfin-dflib` | ⚠️ best effort | The adapter's tests pass in a native image with no metadata. |
+
 Every module's unit tests also run as a native image (`./mvnw -Pnative test` on GraalVM 25). That
 profile turns off the GraalVM reachability metadata repository, so the tests rely only on the
-metadata yfin ships.
+metadata yfin ships. `yfin-it` builds a small consumer app (history, info, income statement, a 10 s
+live stream) as a native executable from the plugin defaults alone. `./mvnw verify -Plive,native`
+builds it and runs it against Yahoo.
 
-| Module | Native status |
-|---|---|
-| `yfin-core` | supported. JSON goes through the Jackson tree model, so no reflection metadata is needed. The JDK `HttpClient` over HTTPS works with no flags. |
-| `yfin-live` | supported. Protobuf `PricingData` decoding and the JDK `WebSocket` (`wss://`) work. The metadata registers protobuf-java's reflective `ExtensionRegistry` lookup. |
-| `yfin-tablesaw` | works (best effort). Tablesaw's `Table` runs a ClassGraph classpath scan in its static initializer; the shipped metadata lets that scan run. In a native image the scan finds no Tablesaw readers or writers, which the adapter does not use. Tablesaw's own CSV and other I/O is not covered. |
-| `yfin-dflib` | works (best effort). The adapter's tests pass in a native image with no metadata. |
+## Contributing
 
-`yfin-it` builds a small consumer app (history, info, income statement, a 10 s live stream) as a
-native executable from the plugin defaults alone. `./mvnw verify -Plive,native` builds it and runs
-it against Yahoo.
+Build requirements, formatting rules, fixture recording and the release process are in
+[CONTRIBUTING.md](CONTRIBUTING.md). The short version: `./mvnw verify` must pass before a commit.
+
+## License
+
+yfin is licensed under the [Apache License 2.0](LICENSE). It is a port of
+[yfinance](https://github.com/ranaroussi/yfinance), also Apache 2.0; see [`NOTICE`](NOTICE) for
+attribution.
