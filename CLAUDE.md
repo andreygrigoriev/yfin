@@ -16,8 +16,10 @@ Always use the wrapper (`./mvnw`), never a bare `mvn`.
   `JAVA_HOME=~/.sdkman/candidates/java/25-graal ./mvnw -Pnative test`. It must pass after changes
   to parsing, resources or dependencies.
 - `./mvnw -Plive,native verify`: also builds and runs the `native-smoke` executable.
-- `./mvnw -Prelease package -Dgpg.skip`: local release-build check. Real releases: push a
-  `vX.Y.Z` tag and `release.yml` deploys to Central (see CONTRIBUTING.md, "Releasing").
+- `./mvnw -Prelease package -Dgpg.skip`: local release-build check. Real releases: the
+  maintainer runs `./mvnw -Prelease deploy` locally (local GPG key, Central token in
+  `~/.m2/settings.xml`), then pushes a `vX.Y.Z` tag. `release.yml` only creates the GitHub release
+  and holds no secrets (see CONTRIBUTING.md, "Releasing").
 - CI: `ci.yml` runs `verify` plus a GraalVM `-Pnative test` job; `nightly-live.yml` runs the live
   ITs on the JVM and `NativeSmokeIT` as a native image.
 - Fixture recording: `./mvnw -pl yfin-it -am install -DskipTests`, then
