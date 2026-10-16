@@ -392,6 +392,12 @@
                             <publishingServerId>central</publishingServerId>
                             <autoPublish>true</autoPublish>
                             <waitUntil>published</waitUntil>
+                            <!-- yfin-it is internal. The bundle is uploaded from the last reactor module
+                                 (yfin-it), so the module is excluded here rather than with skipPublishing,
+                                 which would skip the upload for the whole build -->
+                            <excludeArtifacts>
+                                <artifact>yfin-it</artifact>
+                            </excludeArtifacts>
                         </configuration>
                     </plugin>
                 </plugins>
