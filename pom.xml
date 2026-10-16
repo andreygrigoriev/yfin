@@ -6,7 +6,7 @@
 
     <groupId>io.andreygrigoriev</groupId>
     <artifactId>yfin-parent</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>0.1.1</version>
     <packaging>pom</packaging>
 
     <name>yfin</name>
@@ -339,7 +339,7 @@
     </build>
 
     <profiles>
-        <!-- Maven Central release: ./mvnw -Prelease deploy (needs CENTRAL_* server credentials and a GPG key);
+        <!-- Maven Central release: ./mvnw -Prelease deploy (run locally; needs a `central` server in ~/.m2/settings.xml and a local GPG key);
              local check without signing: ./mvnw -Prelease package -Dgpg.skip -->
         <profile>
             <id>release</id>
@@ -379,13 +379,8 @@
                                 <goals>
                                     <goal>sign</goal>
                                 </goals>
-                                <configuration>
-                                    <!-- passphrase comes from MAVEN_GPG_PASSPHRASE -->
-                                    <gpgArguments>
-                                        <arg>--pinentry-mode</arg>
-                                        <arg>loopback</arg>
-                                    </gpgArguments>
-                                </configuration>
+                                <!-- passphrase: gpg-agent prompts, or MAVEN_GPG_PASSPHRASE (the plugin then
+                                     switches gpg to loopback pinentry itself) -->
                             </execution>
                         </executions>
                     </plugin>

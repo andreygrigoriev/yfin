@@ -126,16 +126,30 @@ for a while.
 
 ## Releasing
 
-Releases are cut by pushing a tag; `.github/workflows/release.yml` does the rest:
+Maven Central publishing runs locally, so the signing key and the Central token never leave the
+maintainer's machine. Pushing the tag afterwards makes `.github/workflows/release.yml` create the
+GitHub release. That workflow needs no secrets.
 
-1. Push a tag `vX.Y.Z` (a suffix such as `v1.2.0-rc1` makes a GitHub pre-release).
-2. The workflow sets the version from the tag (`versions:set -DnewVersion=X.Y.Z`), runs
-   `./mvnw -Prelease deploy` to sign and publish every published module to Maven Central, and
-   creates a GitHub release with `gh release create` and the module jars attached.
+One-time setup:
 
-It needs these repository secrets: `CENTRAL_USERNAME` and `CENTRAL_TOKEN` (a Central Portal user
-token), `GPG_PRIVATE_KEY` (armored) and `GPG_PASSPHRASE`. Check the release build locally first
-with `./mvnw -Prelease package -Dgpg.skip`.
+- A Central Portal user token in `~/.m2/settings.xml`, under a server with id `central`:
+  `<server><id>central</id><username>…</username><password>…</password></server>`.
+- A local GPG key, with its public key uploaded to `keyserver.ubuntu.com` and `keys.openpgp.org`.
+  If you have several secret keys, select one with `-Dgpg.keyname=<KEYID>`.
+
+Cutting release `X.Y.Z` (Central releases are permanent; a suffix such as `1.2.0-rc1` makes a
+GitHub pre-release):
+
+```sh
+./mvnw -Prelease package -Dgpg.skip      # dry run, no signing or upload
+./mvnw versions:set -DnewVersion=X.Y.Z -DgenerateBackupPoms=false -DprocessAllModules=true
+./mvnw -Prelease clean deploy            # signs and publishes every published module
+git checkout -- pom.xml '*/pom.xml'      # the release version is not committed
+git tag vX.Y.Z && git push origin vX.Y.Z # release.yml creates the GitHub release with the jars
+```
+
+gpg-agent asks for the key passphrase, or you can set `MAVEN_GPG_PASSPHRASE` in the shell.
+`deploy` waits until Central reports the release as published.
 
 ## Pull requests
 
