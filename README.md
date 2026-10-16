@@ -98,13 +98,13 @@ flowchart LR
 <dependency>
     <groupId>io.andreygrigoriev</groupId>
     <artifactId>yfin-core</artifactId>
-    <version>1.0.0</version>
+    <version>0.1.1</version>
 </dependency>
 <!-- optional -->
 <dependency>
     <groupId>io.andreygrigoriev</groupId>
     <artifactId>yfin-live</artifactId>
-    <version>1.0.0</version>
+    <version>0.1.1</version>
 </dependency>
 ```
 
@@ -112,11 +112,11 @@ flowchart LR
 
 ```kotlin
 dependencies {
-    implementation("io.andreygrigoriev:yfin-core:1.0.0")
+    implementation("io.andreygrigoriev:yfin-core:0.1.1")
     // optional
-    implementation("io.andreygrigoriev:yfin-live:1.0.0")
-    implementation("io.andreygrigoriev:yfin-tablesaw:1.0.0")
-    implementation("io.andreygrigoriev:yfin-dflib:1.0.0")
+    implementation("io.andreygrigoriev:yfin-live:0.1.1")
+    implementation("io.andreygrigoriev:yfin-tablesaw:0.1.1")
+    implementation("io.andreygrigoriev:yfin-dflib:0.1.1")
 }
 ```
 
