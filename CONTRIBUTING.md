@@ -146,13 +146,19 @@ make release VERSION=X.Y.Z    # publishes X.Y.Z to Central, then pushes the vX.Y
 ```
 
 `make release` first checks the version format, a clean working tree, `master` in sync with
-`origin/master`, that the tag doesn't exist yet, and the `central` server in `settings.xml`. It
-then sets the version with `versions:set`, runs `./mvnw -Prelease clean deploy` and restores the
-poms (the release version is never committed, and the poms are restored when the deploy fails
-too). Only after `deploy` reports the release as published does it tag and push, and
-`release.yml` then creates the GitHub release with the jars.
+`origin/master`, that the tag doesn't exist yet, and the `central` server in `settings.xml`. Next
+it restarts gpg-agent from your terminal and makes a test signature, so the passphrase prompt
+appears before the build. A long-running agent can lose access to the GUI session and then
+fails with `No pinentry` only at the signing step. It then sets the version with `versions:set`,
+runs `./mvnw -Prelease clean deploy` and restores the poms (the release version is never
+committed, and the poms are restored when the deploy fails or is interrupted too). Only after
+`deploy` reports the release as published does it tag and push, and `release.yml` then creates
+the GitHub release with the jars.
 
-gpg-agent asks for the key passphrase, or you can set `MAVEN_GPG_PASSPHRASE` in the shell.
+To skip the agent, export the passphrase first (`read -s` keeps it out of the shell history):
+`read -s MAVEN_GPG_PASSPHRASE && export MAVEN_GPG_PASSPHRASE`. If pinentry-mac still can't show
+its dialog, switch `pinentry-program` in `~/.gnupg/gpg-agent.conf` to
+`/opt/homebrew/bin/pinentry-curses`.
 
 ## Pull requests
 

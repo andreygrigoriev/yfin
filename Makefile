@@ -35,13 +35,24 @@ release-check:
 		|| { echo "no 'central' server in ~/.m2/settings.xml"; exit 1; }; \
 	echo "ready to release $(VERSION) from $(RELEASE_BRANCH) @ $$(git rev-parse --short HEAD)"
 
+# Unless MAVEN_GPG_PASSPHRASE is set, gpg-agent is restarted from this terminal and the key is
+# unlocked with a test signature before the build: a long-running agent that lost the GUI session
+# fails with "No pinentry" only once the build reaches the signing step.
 # The release version is set only for the deploy and never committed; the poms are restored even
-# when the deploy fails. Central releases are permanent, so the tag is pushed only after the deploy
-# reports the release as published.
+# when the deploy fails or is interrupted. Central releases are permanent, so the tag is pushed
+# only after the deploy reports the release as published.
 release: release-check
 	@set -euo pipefail; \
+	if [[ -z "$${MAVEN_GPG_PASSPHRASE:-}" ]]; then \
+		echo "restarting gpg-agent and unlocking the signing key"; \
+		gpgconf --kill gpg-agent; \
+		if [[ -t 0 ]]; then export GPG_TTY="$$(tty)"; fi; \
+		echo "yfin $(VERSION)" | gpg --clearsign >/dev/null \
+			|| { echo "gpg could not sign; see CONTRIBUTING.md, \"Releasing\""; exit 1; }; \
+	fi; \
 	restore() { git checkout -q -- '*pom.xml'; }; \
 	trap restore EXIT; \
+	trap 'exit 130' INT TERM; \
 	$(MVNW) -q versions:set -DnewVersion="$(VERSION)" -DgenerateBackupPoms=false -DprocessAllModules=true; \
 	$(MVNW) -Prelease clean deploy; \
 	restore; trap - EXIT; \
