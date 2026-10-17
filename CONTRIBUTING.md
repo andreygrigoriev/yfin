@@ -88,7 +88,7 @@ and commit the fixture together with the test that uses it.
 
 ### Using fixtures in tests
 
-`FakeTransport` comes from the `yfin-core` test-jar (`io.andreygrigoriev.yfin.testing`). Other
+`FakeTransport` comes from the `yfin-core` test-jar (`io.github.andreygrigoriev.yfin.testing`). Other
 modules can use it by depending on the test-jar.
 
 ```java

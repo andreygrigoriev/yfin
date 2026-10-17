@@ -76,10 +76,10 @@ with one shared version, and they need Java 25.
 
 | Artifact | JPMS module | Contents | Extra dependencies |
 |---|---|---|---|
-| `yfin-core` | `io.andreygrigoriev.yfin` | client, `Ticker`, every endpoint, models | Jackson, SLF4J API |
-| `yfin-live` | `io.andreygrigoriev.yfin.live` | WebSocket price streaming | protobuf-java |
-| `yfin-tablesaw` | `io.andreygrigoriev.yfin.tablesaw` | records → Tablesaw `Table` | tablesaw-core |
-| `yfin-dflib` | `io.andreygrigoriev.yfin.dflib` | records → DFLib `DataFrame` | dflib |
+| `yfin-core` | `io.github.andreygrigoriev.yfin` | client, `Ticker`, every endpoint, models | Jackson, SLF4J API |
+| `yfin-live` | `io.github.andreygrigoriev.yfin.live` | WebSocket price streaming | protobuf-java |
+| `yfin-tablesaw` | `io.github.andreygrigoriev.yfin.tablesaw` | records → Tablesaw `Table` | tablesaw-core |
+| `yfin-dflib` | `io.github.andreygrigoriev.yfin.dflib` | records → DFLib `DataFrame` | dflib |
 
 ```mermaid
 flowchart LR
@@ -120,18 +120,18 @@ dependencies {
 }
 ```
 
-**Module path.** Add `requires io.andreygrigoriev.yfin;`, or the `.live`, `.tablesaw` or `.dflib`
-module, each of which re-exports core. Core exports only `io.andreygrigoriev.yfin`, `…yfin.model`,
+**Module path.** Add `requires io.github.andreygrigoriev.yfin;`, or the `.live`, `.tablesaw` or `.dflib`
+module, each of which re-exports core. Core exports only `io.github.andreygrigoriev.yfin`, `…yfin.model`,
 `…yfin.request`, `…yfin.spi` and `…yfin.exception`. Everything under `…yfin.internal` is private.
 
 ## Quickstart
 
 ```java
-import io.andreygrigoriev.yfin.Ticker;
-import io.andreygrigoriev.yfin.YFinance;
-import io.andreygrigoriev.yfin.model.Bar;
-import io.andreygrigoriev.yfin.model.PriceHistory;
-import io.andreygrigoriev.yfin.request.Period;
+import io.github.andreygrigoriev.yfin.Ticker;
+import io.github.andreygrigoriev.yfin.YFinance;
+import io.github.andreygrigoriev.yfin.model.Bar;
+import io.github.andreygrigoriev.yfin.model.PriceHistory;
+import io.github.andreygrigoriev.yfin.request.Period;
 
 try (YFinance yf = YFinance.create()) {
     Ticker aapl = yf.ticker("AAPL");
@@ -167,7 +167,7 @@ YFinance yf = YFinance.builder()
         .build();
 ```
 
-**Custom transport.** `Transport` (`io.andreygrigoriev.yfin.spi`) is a public SPI for the HTTP
+**Custom transport.** `Transport` (`io.github.andreygrigoriev.yfin.spi`) is a public SPI for the HTTP
 layer. Pass your own with `.transport(myTransport)` to change TLS, add logging or headers, or stub
 Yahoo in tests.
 
@@ -427,20 +427,20 @@ yfin logs through the SLF4J 2.x API and ships no binding. Add one (Logback, `slf
 messages. This replaces yfinance's `enable_debug_mode()`. For example, with Logback:
 
 ```xml
-<logger name="io.andreygrigoriev.yfin" level="DEBUG"/>
+<logger name="io.github.andreygrigoriev.yfin" level="DEBUG"/>
 ```
 
 <details>
-<summary><b>Logger names</b> (class names under <code>io.andreygrigoriev.yfin</code>)</summary>
+<summary><b>Logger names</b> (class names under <code>io.github.andreygrigoriev.yfin</code>)</summary>
 
 | Logger | What it logs |
 |---|---|
-| `io.andreygrigoriev.yfin.internal.http.RetryPolicy` | retries, backoff delays (debug/warn) |
-| `io.andreygrigoriev.yfin.internal.http.YahooSession` | cookie/crumb bootstrap, consent flow, refresh |
-| `io.andreygrigoriev.yfin.internal.endpoint` | per-endpoint requests and payload issues |
-| `io.andreygrigoriev.yfin.internal.repair` | price repair decisions |
-| `io.andreygrigoriev.yfin.internal.cache.FileCache` | cache file read/write problems (warn; the cache then ignores the file) |
-| `io.andreygrigoriev.yfin.live.LiveStream` | connect, reconnect, decode errors |
+| `io.github.andreygrigoriev.yfin.internal.http.RetryPolicy` | retries, backoff delays (debug/warn) |
+| `io.github.andreygrigoriev.yfin.internal.http.YahooSession` | cookie/crumb bootstrap, consent flow, refresh |
+| `io.github.andreygrigoriev.yfin.internal.endpoint` | per-endpoint requests and payload issues |
+| `io.github.andreygrigoriev.yfin.internal.repair` | price repair decisions |
+| `io.github.andreygrigoriev.yfin.internal.cache.FileCache` | cache file read/write problems (warn; the cache then ignores the file) |
+| `io.github.andreygrigoriev.yfin.live.LiveStream` | connect, reconnect, decode errors |
 
 </details>
 

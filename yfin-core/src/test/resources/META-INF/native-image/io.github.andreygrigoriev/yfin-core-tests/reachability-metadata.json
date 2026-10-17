@@ -1,7 +1,7 @@
 {
   "reflection": [
     {
-      "type": "io.andreygrigoriev.yfin.model.LineItem",
+      "type": "io.github.andreygrigoriev.yfin.model.LineItem",
       "allPublicFields": true
     }
   ],

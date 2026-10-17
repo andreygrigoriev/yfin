@@ -20,7 +20,7 @@
         <maven.javadoc.skip>true</maven.javadoc.skip>
         <maven.source.skip>true</maven.source.skip>
         <gpg.skip>true</gpg.skip>
-        <exec.mainClass>io.andreygrigoriev.yfin.it.FixtureRecorder</exec.mainClass>
+        <exec.mainClass>io.github.andreygrigoriev.yfin.it.FixtureRecorder</exec.mainClass>
     </properties>
 
     <build>
@@ -72,7 +72,7 @@
                                     <goal>compile-no-fork</goal>
                                 </goals>
                                 <configuration>
-                                    <mainClass>io.andreygrigoriev.yfin.it.smoke.NativeSmoke</mainClass>
+                                    <mainClass>io.github.andreygrigoriev.yfin.it.smoke.NativeSmoke</mainClass>
                                     <imageName>native-smoke</imageName>
                                     <!-- internal module: no SBOM (Oracle GraalVM would attach one to install/deploy) -->
                                     <skipBaseSBOM>true</skipBaseSBOM>
