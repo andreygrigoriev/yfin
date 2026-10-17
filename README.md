@@ -4,8 +4,8 @@
 
 **Yahoo Finance market data for Java 25: a port of [yfinance](https://github.com/ranaroussi/yfinance).**
 
-[![Maven Central](https://img.shields.io/maven-central/v/io.andreygrigoriev/yfin-core?label=Maven%20Central&color=blue)](https://central.sonatype.com/artifact/io.andreygrigoriev/yfin-core)
-[![Javadoc](https://javadoc.io/badge2/io.andreygrigoriev/yfin-core/javadoc.svg)](https://javadoc.io/doc/io.andreygrigoriev/yfin-core)
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.andreygrigoriev/yfin-core?label=Maven%20Central&color=blue)](https://central.sonatype.com/artifact/io.github.andreygrigoriev/yfin-core)
+[![Javadoc](https://javadoc.io/badge2/io.github.andreygrigoriev/yfin-core/javadoc.svg)](https://javadoc.io/doc/io.github.andreygrigoriev/yfin-core)
 [![CI](https://github.com/andreygrigoriev/yfin/actions/workflows/ci.yml/badge.svg)](https://github.com/andreygrigoriev/yfin/actions/workflows/ci.yml)
 [![Nightly live](https://github.com/andreygrigoriev/yfin/actions/workflows/nightly-live.yml/badge.svg)](https://github.com/andreygrigoriev/yfin/actions/workflows/nightly-live.yml)
 <br>
@@ -96,13 +96,13 @@ flowchart LR
 
 ```xml
 <dependency>
-    <groupId>io.andreygrigoriev</groupId>
+    <groupId>io.github.andreygrigoriev</groupId>
     <artifactId>yfin-core</artifactId>
     <version>0.1.1</version>
 </dependency>
 <!-- optional -->
 <dependency>
-    <groupId>io.andreygrigoriev</groupId>
+    <groupId>io.github.andreygrigoriev</groupId>
     <artifactId>yfin-live</artifactId>
     <version>0.1.1</version>
 </dependency>
@@ -112,11 +112,11 @@ flowchart LR
 
 ```kotlin
 dependencies {
-    implementation("io.andreygrigoriev:yfin-core:0.1.1")
+    implementation("io.github.andreygrigoriev:yfin-core:0.1.1")
     // optional
-    implementation("io.andreygrigoriev:yfin-live:0.1.1")
-    implementation("io.andreygrigoriev:yfin-tablesaw:0.1.1")
-    implementation("io.andreygrigoriev:yfin-dflib:0.1.1")
+    implementation("io.github.andreygrigoriev:yfin-live:0.1.1")
+    implementation("io.github.andreygrigoriev:yfin-tablesaw:0.1.1")
+    implementation("io.github.andreygrigoriev:yfin-dflib:0.1.1")
 }
 ```
 
@@ -535,7 +535,7 @@ t.incomeStatement(Frequency.QUARTERLY);
 
 Applications using yfin can be compiled into native executables. You don't need extra
 `native-image` flags, `--enable-url-protocols`, or your own reachability metadata. Each module
-ships its metadata at `META-INF/native-image/io.andreygrigoriev/<artifactId>/reachability-metadata.json`.
+ships its metadata at `META-INF/native-image/io.github.andreygrigoriev/<artifactId>/reachability-metadata.json`.
 
 | Module | Native status | Notes |
 |---|---|---|

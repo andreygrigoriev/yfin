@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>io.andreygrigoriev</groupId>
+        <groupId>io.github.andreygrigoriev</groupId>
         <artifactId>yfin-parent</artifactId>
         <version>0.1.1</version>
     </parent>
@@ -15,7 +15,7 @@
 
     <dependencies>
         <dependency>
-            <groupId>io.andreygrigoriev</groupId>
+            <groupId>io.github.andreygrigoriev</groupId>
             <artifactId>yfin-core</artifactId>
         </dependency>
         <dependency>

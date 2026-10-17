@@ -1,7 +1,7 @@
 # yfin
 
 Java 25 port of yfinance 1.7.0 (reference commit in `NOTICE`). Multi-module Maven build, parent
-`io.andreygrigoriev:yfin-parent`.
+`io.github.andreygrigoriev:yfin-parent`.
 
 ## Build commands
 
@@ -61,7 +61,7 @@ Always use the wrapper (`./mvnw`), never a bare `mvn`.
   resources (`StatementKeys`, `ScreenerFields`).
 - GraalVM: no classpath scanning, `Class.forName`, dynamic proxies or bytecode generation in
   library code. Anything reflective, or any resource, goes into
-  `META-INF/native-image/io.andreygrigoriev/<artifactId>/reachability-metadata.json` in the same
+  `META-INF/native-image/io.github.andreygrigoriev/<artifactId>/reachability-metadata.json` in the same
   change.
 - Every package that contains classes has a `package-info.java` with `@NullMarked` (JSpecify).
 - Javadoc lint is `all,-missing`, and its warnings fail the build. Watch for broken `{@link}`
