@@ -141,15 +141,18 @@ Cutting release `X.Y.Z` (Central releases are permanent; a suffix such as `1.2.0
 GitHub pre-release):
 
 ```sh
-./mvnw -Prelease package -Dgpg.skip      # dry run, no signing or upload
-./mvnw versions:set -DnewVersion=X.Y.Z -DgenerateBackupPoms=false -DprocessAllModules=true
-./mvnw -Prelease clean deploy            # signs and publishes every published module
-git checkout -- pom.xml '*/pom.xml'      # the release version is not committed
-git tag vX.Y.Z && git push origin vX.Y.Z # release.yml creates the GitHub release with the jars
+make release-dry-run          # builds and lists the Central bundle, no signing or upload
+make release VERSION=X.Y.Z    # publishes X.Y.Z to Central, then pushes the vX.Y.Z tag
 ```
 
+`make release` first checks the version format, a clean working tree, `master` in sync with
+`origin/master`, that the tag doesn't exist yet, and the `central` server in `settings.xml`. It
+then sets the version with `versions:set`, runs `./mvnw -Prelease clean deploy` and restores the
+poms (the release version is never committed, and the poms are restored when the deploy fails
+too). Only after `deploy` reports the release as published does it tag and push, and
+`release.yml` then creates the GitHub release with the jars.
+
 gpg-agent asks for the key passphrase, or you can set `MAVEN_GPG_PASSPHRASE` in the shell.
-`deploy` waits until Central reports the release as published.
 
 ## Pull requests
 
