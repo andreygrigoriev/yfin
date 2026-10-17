@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>io.andreygrigoriev</groupId>
+        <groupId>io.github.andreygrigoriev</groupId>
         <artifactId>yfin-parent</artifactId>
         <version>0.1.1</version>
     </parent>
@@ -14,13 +14,13 @@
     <name>yfin integration tests</name>
 
     <properties>
-        <!-- internal module: never deployed or published -->
+        <!-- internal module: never deployed or published (excluded from the Central bundle in the
+             parent's release profile; skipPublishing here would skip the upload for the whole build) -->
         <maven.deploy.skip>true</maven.deploy.skip>
-        <skipPublishing>true</skipPublishing>
         <maven.javadoc.skip>true</maven.javadoc.skip>
         <maven.source.skip>true</maven.source.skip>
         <gpg.skip>true</gpg.skip>
-        <exec.mainClass>io.andreygrigoriev.yfin.it.FixtureRecorder</exec.mainClass>
+        <exec.mainClass>io.github.andreygrigoriev.yfin.it.FixtureRecorder</exec.mainClass>
     </properties>
 
     <build>
@@ -72,7 +72,7 @@
                                     <goal>compile-no-fork</goal>
                                 </goals>
                                 <configuration>
-                                    <mainClass>io.andreygrigoriev.yfin.it.smoke.NativeSmoke</mainClass>
+                                    <mainClass>io.github.andreygrigoriev.yfin.it.smoke.NativeSmoke</mainClass>
                                     <imageName>native-smoke</imageName>
                                     <!-- internal module: no SBOM (Oracle GraalVM would attach one to install/deploy) -->
                                     <skipBaseSBOM>true</skipBaseSBOM>
@@ -87,11 +87,11 @@
 
     <dependencies>
         <dependency>
-            <groupId>io.andreygrigoriev</groupId>
+            <groupId>io.github.andreygrigoriev</groupId>
             <artifactId>yfin-core</artifactId>
         </dependency>
         <dependency>
-            <groupId>io.andreygrigoriev</groupId>
+            <groupId>io.github.andreygrigoriev</groupId>
             <artifactId>yfin-live</artifactId>
         </dependency>
         <dependency>
@@ -105,7 +105,7 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>io.andreygrigoriev</groupId>
+            <groupId>io.github.andreygrigoriev</groupId>
             <artifactId>yfin-core</artifactId>
             <type>test-jar</type>
             <scope>test</scope>

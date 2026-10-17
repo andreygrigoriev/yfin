@@ -4,8 +4,8 @@
 
 **Yahoo Finance market data for Java 25: a port of [yfinance](https://github.com/ranaroussi/yfinance).**
 
-[![Maven Central](https://img.shields.io/maven-central/v/io.andreygrigoriev/yfin-core?label=Maven%20Central&color=blue)](https://central.sonatype.com/artifact/io.andreygrigoriev/yfin-core)
-[![Javadoc](https://javadoc.io/badge2/io.andreygrigoriev/yfin-core/javadoc.svg)](https://javadoc.io/doc/io.andreygrigoriev/yfin-core)
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.andreygrigoriev/yfin-core?label=Maven%20Central&color=blue)](https://central.sonatype.com/artifact/io.github.andreygrigoriev/yfin-core)
+[![Javadoc](https://javadoc.io/badge2/io.github.andreygrigoriev/yfin-core/javadoc.svg)](https://javadoc.io/doc/io.github.andreygrigoriev/yfin-core)
 [![CI](https://github.com/andreygrigoriev/yfin/actions/workflows/ci.yml/badge.svg)](https://github.com/andreygrigoriev/yfin/actions/workflows/ci.yml)
 [![Nightly live](https://github.com/andreygrigoriev/yfin/actions/workflows/nightly-live.yml/badge.svg)](https://github.com/andreygrigoriev/yfin/actions/workflows/nightly-live.yml)
 <br>
@@ -71,15 +71,15 @@ concurrency limit with retries and backoff, a pluggable HTTP transport, JPMS mod
 
 ## Install
 
-All modules are published to Maven Central under `io.andreygrigoriev`. They are released together
+All modules are published to Maven Central under `io.github.andreygrigoriev`. They are released together
 with one shared version, and they need Java 25.
 
 | Artifact | JPMS module | Contents | Extra dependencies |
 |---|---|---|---|
-| `yfin-core` | `io.andreygrigoriev.yfin` | client, `Ticker`, every endpoint, models | Jackson, SLF4J API |
-| `yfin-live` | `io.andreygrigoriev.yfin.live` | WebSocket price streaming | protobuf-java |
-| `yfin-tablesaw` | `io.andreygrigoriev.yfin.tablesaw` | records → Tablesaw `Table` | tablesaw-core |
-| `yfin-dflib` | `io.andreygrigoriev.yfin.dflib` | records → DFLib `DataFrame` | dflib |
+| `yfin-core` | `io.github.andreygrigoriev.yfin` | client, `Ticker`, every endpoint, models | Jackson, SLF4J API |
+| `yfin-live` | `io.github.andreygrigoriev.yfin.live` | WebSocket price streaming | protobuf-java |
+| `yfin-tablesaw` | `io.github.andreygrigoriev.yfin.tablesaw` | records → Tablesaw `Table` | tablesaw-core |
+| `yfin-dflib` | `io.github.andreygrigoriev.yfin.dflib` | records → DFLib `DataFrame` | dflib |
 
 ```mermaid
 flowchart LR
@@ -96,13 +96,13 @@ flowchart LR
 
 ```xml
 <dependency>
-    <groupId>io.andreygrigoriev</groupId>
+    <groupId>io.github.andreygrigoriev</groupId>
     <artifactId>yfin-core</artifactId>
     <version>0.1.1</version>
 </dependency>
 <!-- optional -->
 <dependency>
-    <groupId>io.andreygrigoriev</groupId>
+    <groupId>io.github.andreygrigoriev</groupId>
     <artifactId>yfin-live</artifactId>
     <version>0.1.1</version>
 </dependency>
@@ -112,26 +112,26 @@ flowchart LR
 
 ```kotlin
 dependencies {
-    implementation("io.andreygrigoriev:yfin-core:0.1.1")
+    implementation("io.github.andreygrigoriev:yfin-core:0.1.1")
     // optional
-    implementation("io.andreygrigoriev:yfin-live:0.1.1")
-    implementation("io.andreygrigoriev:yfin-tablesaw:0.1.1")
-    implementation("io.andreygrigoriev:yfin-dflib:0.1.1")
+    implementation("io.github.andreygrigoriev:yfin-live:0.1.1")
+    implementation("io.github.andreygrigoriev:yfin-tablesaw:0.1.1")
+    implementation("io.github.andreygrigoriev:yfin-dflib:0.1.1")
 }
 ```
 
-**Module path.** Add `requires io.andreygrigoriev.yfin;`, or the `.live`, `.tablesaw` or `.dflib`
-module, each of which re-exports core. Core exports only `io.andreygrigoriev.yfin`, `…yfin.model`,
+**Module path.** Add `requires io.github.andreygrigoriev.yfin;`, or the `.live`, `.tablesaw` or `.dflib`
+module, each of which re-exports core. Core exports only `io.github.andreygrigoriev.yfin`, `…yfin.model`,
 `…yfin.request`, `…yfin.spi` and `…yfin.exception`. Everything under `…yfin.internal` is private.
 
 ## Quickstart
 
 ```java
-import io.andreygrigoriev.yfin.Ticker;
-import io.andreygrigoriev.yfin.YFinance;
-import io.andreygrigoriev.yfin.model.Bar;
-import io.andreygrigoriev.yfin.model.PriceHistory;
-import io.andreygrigoriev.yfin.request.Period;
+import io.github.andreygrigoriev.yfin.Ticker;
+import io.github.andreygrigoriev.yfin.YFinance;
+import io.github.andreygrigoriev.yfin.model.Bar;
+import io.github.andreygrigoriev.yfin.model.PriceHistory;
+import io.github.andreygrigoriev.yfin.request.Period;
 
 try (YFinance yf = YFinance.create()) {
     Ticker aapl = yf.ticker("AAPL");
@@ -167,7 +167,7 @@ YFinance yf = YFinance.builder()
         .build();
 ```
 
-**Custom transport.** `Transport` (`io.andreygrigoriev.yfin.spi`) is a public SPI for the HTTP
+**Custom transport.** `Transport` (`io.github.andreygrigoriev.yfin.spi`) is a public SPI for the HTTP
 layer. Pass your own with `.transport(myTransport)` to change TLS, add logging or headers, or stub
 Yahoo in tests.
 
@@ -427,20 +427,20 @@ yfin logs through the SLF4J 2.x API and ships no binding. Add one (Logback, `slf
 messages. This replaces yfinance's `enable_debug_mode()`. For example, with Logback:
 
 ```xml
-<logger name="io.andreygrigoriev.yfin" level="DEBUG"/>
+<logger name="io.github.andreygrigoriev.yfin" level="DEBUG"/>
 ```
 
 <details>
-<summary><b>Logger names</b> (class names under <code>io.andreygrigoriev.yfin</code>)</summary>
+<summary><b>Logger names</b> (class names under <code>io.github.andreygrigoriev.yfin</code>)</summary>
 
 | Logger | What it logs |
 |---|---|
-| `io.andreygrigoriev.yfin.internal.http.RetryPolicy` | retries, backoff delays (debug/warn) |
-| `io.andreygrigoriev.yfin.internal.http.YahooSession` | cookie/crumb bootstrap, consent flow, refresh |
-| `io.andreygrigoriev.yfin.internal.endpoint` | per-endpoint requests and payload issues |
-| `io.andreygrigoriev.yfin.internal.repair` | price repair decisions |
-| `io.andreygrigoriev.yfin.internal.cache.FileCache` | cache file read/write problems (warn; the cache then ignores the file) |
-| `io.andreygrigoriev.yfin.live.LiveStream` | connect, reconnect, decode errors |
+| `io.github.andreygrigoriev.yfin.internal.http.RetryPolicy` | retries, backoff delays (debug/warn) |
+| `io.github.andreygrigoriev.yfin.internal.http.YahooSession` | cookie/crumb bootstrap, consent flow, refresh |
+| `io.github.andreygrigoriev.yfin.internal.endpoint` | per-endpoint requests and payload issues |
+| `io.github.andreygrigoriev.yfin.internal.repair` | price repair decisions |
+| `io.github.andreygrigoriev.yfin.internal.cache.FileCache` | cache file read/write problems (warn; the cache then ignores the file) |
+| `io.github.andreygrigoriev.yfin.live.LiveStream` | connect, reconnect, decode errors |
 
 </details>
 
@@ -535,7 +535,7 @@ t.incomeStatement(Frequency.QUARTERLY);
 
 Applications using yfin can be compiled into native executables. You don't need extra
 `native-image` flags, `--enable-url-protocols`, or your own reachability metadata. Each module
-ships its metadata at `META-INF/native-image/io.andreygrigoriev/<artifactId>/reachability-metadata.json`.
+ships its metadata at `META-INF/native-image/io.github.andreygrigoriev/<artifactId>/reachability-metadata.json`.
 
 | Module | Native status | Notes |
 |---|---|---|

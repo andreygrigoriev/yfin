@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>io.andreygrigoriev</groupId>
+        <groupId>io.github.andreygrigoriev</groupId>
         <artifactId>yfin-parent</artifactId>
         <version>0.1.1</version>
     </parent>
@@ -60,7 +60,7 @@
                         <configuration>
                             <compilerArgs combine.children="append">
                                 <arg>--add-modules=jdk.httpserver</arg>
-                                <arg>--add-reads=io.andreygrigoriev.yfin=jdk.httpserver</arg>
+                                <arg>--add-reads=io.github.andreygrigoriev.yfin=jdk.httpserver</arg>
                             </compilerArgs>
                         </configuration>
                     </execution>
@@ -70,7 +70,7 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
-                    <argLine>--add-modules=jdk.httpserver --add-reads=io.andreygrigoriev.yfin=jdk.httpserver</argLine>
+                    <argLine>--add-modules=jdk.httpserver --add-reads=io.github.andreygrigoriev.yfin=jdk.httpserver</argLine>
                 </configuration>
             </plugin>
             <plugin>

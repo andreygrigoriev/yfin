@@ -2,7 +2,7 @@
 // Apache License 2.0. Changes: the java_* options below; message and fields are unchanged.
 syntax = "proto3";
 
-option java_package = "io.andreygrigoriev.yfin.live.internal.proto";
+option java_package = "io.github.andreygrigoriev.yfin.live.internal.proto";
 option java_outer_classname = "PricingProto";
 option java_multiple_files = true;
 

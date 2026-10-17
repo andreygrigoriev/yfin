@@ -45,7 +45,7 @@ Consumers compile yfin into native executables with no extra configuration, so l
   dynamic proxies;
 - parse JSON with the Jackson tree model (`JsonNode`). If a class must be bound reflectively,
   register it in the module's
-  `src/main/resources/META-INF/native-image/io.andreygrigoriev/<artifactId>/reachability-metadata.json`;
+  `src/main/resources/META-INF/native-image/io.github.andreygrigoriev/<artifactId>/reachability-metadata.json`;
 - register any resource it loads at runtime in the same metadata file.
 
 `./mvnw -Pnative test` turns off the GraalVM reachability metadata repository, so it proves that
@@ -88,7 +88,7 @@ and commit the fixture together with the test that uses it.
 
 ### Using fixtures in tests
 
-`FakeTransport` comes from the `yfin-core` test-jar (`io.andreygrigoriev.yfin.testing`). Other
+`FakeTransport` comes from the `yfin-core` test-jar (`io.github.andreygrigoriev.yfin.testing`). Other
 modules can use it by depending on the test-jar.
 
 ```java

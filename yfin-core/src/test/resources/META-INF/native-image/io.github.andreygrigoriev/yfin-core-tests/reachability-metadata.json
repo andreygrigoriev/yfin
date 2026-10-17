@@ -1,0 +1,13 @@
+{
+  "reflection": [
+    {
+      "type": "io.github.andreygrigoriev.yfin.model.LineItem",
+      "allPublicFields": true
+    }
+  ],
+  "resources": [
+    {
+      "glob": "repair/*.csv"
+    }
+  ]
+}

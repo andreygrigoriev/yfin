@@ -1,14 +1,14 @@
 /** Java port of yfinance: Yahoo Finance market data client. */
-module io.andreygrigoriev.yfin {
+module io.github.andreygrigoriev.yfin {
     requires java.net.http;
     requires com.fasterxml.jackson.databind;
     requires com.fasterxml.jackson.datatype.jsr310;
     requires org.slf4j;
     requires static org.jspecify;
 
-    exports io.andreygrigoriev.yfin;
-    exports io.andreygrigoriev.yfin.model;
-    exports io.andreygrigoriev.yfin.request;
-    exports io.andreygrigoriev.yfin.spi;
-    exports io.andreygrigoriev.yfin.exception;
+    exports io.github.andreygrigoriev.yfin;
+    exports io.github.andreygrigoriev.yfin.model;
+    exports io.github.andreygrigoriev.yfin.request;
+    exports io.github.andreygrigoriev.yfin.spi;
+    exports io.github.andreygrigoriev.yfin.exception;
 }
