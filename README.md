@@ -71,7 +71,7 @@ concurrency limit with retries and backoff, a pluggable HTTP transport, JPMS mod
 
 ## Install
 
-All modules are published to Maven Central under `io.andreygrigoriev`. They are released together
+All modules are published to Maven Central under `io.github.andreygrigoriev`. They are released together
 with one shared version, and they need Java 25.
 
 | Artifact | JPMS module | Contents | Extra dependencies |
