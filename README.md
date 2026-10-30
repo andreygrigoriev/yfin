@@ -51,6 +51,10 @@ It is also built for production use: one thread-safe client with no global state
 concurrency limit with retries and backoff, a pluggable HTTP transport, JPMS modules, and
 [GraalVM native image](#graalvm-native-image) support without extra flags.
 
+Prefer the terminal? [yfin-cli](https://github.com/andreygrigoriev/yfin-cli) is a native
+command-line tool on top of this library (`brew install andreygrigoriev/tap/yfin`) that prints the
+same data as tables, CSV or JSON.
+
 <details>
 <summary><b>Table of contents</b></summary>
 
