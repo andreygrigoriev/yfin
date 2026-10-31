@@ -35,7 +35,7 @@ are optional. The reference version is yfinance 1.7.0 (see [`NOTICE`](NOTICE)).
 | | Area | What you get |
 |---|---|---|
 | 📈 | [Price history](#price-history) | OHLCV bars for any period or interval, dividends, splits, optional price repair |
-| 🏢 | [Info](#info-and-fast-info) | company profile, quote snapshot, cheap `fastInfo()`, ISIN |
+| 🏢 | [Info](#info-and-fast-info) | company profile, quote snapshot, cheap `fastInfo()`, ISIN, batched `quotes()` for many symbols |
 | 📊 | [Financials](#financial-statements-and-valuation) | income statement, balance sheet, cash flow (annual, quarterly, TTM), valuation |
 | 👥 | [Holders and analysts](#holders-analysts-earnings-calendar) | institutional and insider holders, recommendations, price targets, estimates |
 | 🔗 | [Options](#options) | expirations and full option chains |
@@ -232,7 +232,14 @@ FastInfo fast = msft.fastInfo();        // lazy: requests made on first access
 Double last = fast.lastPrice();
 
 Optional<String> isin = msft.isin();
+
+// real-time quotes of many symbols, 200 per request
+Map<String, Quote> quotes = yf.quotes(List.of("AAPL", "MSFT", "^VIX"));
+Double price = quotes.get("AAPL").price();
 ```
+
+`quotes()` is strict: if any batch fails, the call throws and returns no partial result. Symbols
+Yahoo does not know are absent from the map.
 
 ### Financial statements and valuation
 
@@ -420,6 +427,8 @@ Recommendations:
 - For hundreds of symbols, lower `maxConcurrentRequests` (2 to 4), spread the work over time, and
   catch `YFRateLimitException` to back off at the application level.
 - `fastInfo()` is cheaper than `info()`, which makes three requests.
+- For many symbols use `quotes()`: one request per 200 symbols (a thousand symbols cost five), sent
+  one after another through the client's limiter.
 
 > [!CAUTION]
 > If Yahoo blocks your IP, wait. Retrying immediately makes the block last longer.
@@ -476,6 +485,7 @@ t.incomeStatement(Frequency.QUARTERLY);
 | `Ticker.history(period=, interval=, start=, end=, prepost=, auto_adjust=, back_adjust=, actions=, repair=, keepna=)` | `history(HistoryRequest)` / `history(Period)` / `history()` |
 | `dividends`, `splits`, `capital_gains`, `actions`, `history_metadata` | `dividends()`, `splits()`, `capitalGains()`, `actions()`, `historyMetadata()` |
 | `info`, `fast_info` | `info()` (`TickerInfo`, incl. `trailingPegRatio`), `fastInfo()` |
+| (no equivalent; `download` is history only) | `quotes(Collection<String>)` returning `Map<String, Quote>` |
 | `major_holders`, `institutional_holders`, `mutualfund_holders` | `majorHolders()`, `institutionalHolders()`, `mutualFundHolders()` |
 | `insider_transactions`, `insider_purchases`, `insider_roster_holders` | `insiderTransactions()`, `insiderPurchases()`, `insiderRosterHolders()` |
 | `recommendations`, `recommendations_summary`, `upgrades_downgrades` | `recommendations()`, `recommendationsSummary()`, `upgradesDowngrades()` |
