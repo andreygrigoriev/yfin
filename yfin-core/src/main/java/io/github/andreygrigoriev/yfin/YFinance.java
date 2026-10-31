@@ -70,6 +70,8 @@ public final class YFinance implements AutoCloseable {
     public static final Duration DEFAULT_CONNECT_TIMEOUT = Duration.ofSeconds(10);
     /** Default timeout for a single request. */
     public static final Duration DEFAULT_REQUEST_TIMEOUT = Duration.ofSeconds(30);
+    /** Symbols per {@code /v7/finance/quote} request made by {@link #quotes(Collection)}. */
+    public static final int QUOTE_BATCH_SIZE = 200;
 
     private final Transport transport;
     private final boolean ownsTransport;
@@ -195,9 +197,6 @@ public final class YFinance implements AutoCloseable {
         }
         return Collections.unmodifiableMap(results);
     }
-
-    /** Symbols per {@code /v7/finance/quote} request made by {@link #quotes(Collection)}. */
-    public static final int QUOTE_BATCH_SIZE = 200;
 
     /**
      * Real-time quotes of {@code symbols} from the batched {@code /v7/finance/quote} endpoint,
