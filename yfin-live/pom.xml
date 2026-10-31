@@ -7,7 +7,7 @@
     <parent>
         <groupId>io.github.andreygrigoriev</groupId>
         <artifactId>yfin-parent</artifactId>
-        <version>0.1.1</version>
+        <version>0.2.2</version>
     </parent>
 
     <artifactId>yfin-live</artifactId>
