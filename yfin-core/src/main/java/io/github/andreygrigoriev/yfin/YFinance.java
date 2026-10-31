@@ -5,6 +5,8 @@ import io.github.andreygrigoriev.yfin.exception.YFTransportException;
 import io.github.andreygrigoriev.yfin.exception.YFinanceException;
 import io.github.andreygrigoriev.yfin.internal.cache.FileCache;
 import io.github.andreygrigoriev.yfin.internal.endpoint.calendar.CalendarEndpoint;
+import io.github.andreygrigoriev.yfin.internal.endpoint.quote.QuoteEndpoint;
+import io.github.andreygrigoriev.yfin.internal.endpoint.quote.QuoteMapper;
 import io.github.andreygrigoriev.yfin.internal.endpoint.screener.ScreenerEndpoint;
 import io.github.andreygrigoriev.yfin.internal.endpoint.search.LookupEndpoint;
 import io.github.andreygrigoriev.yfin.internal.endpoint.search.SearchEndpoint;
@@ -17,6 +19,7 @@ import io.github.andreygrigoriev.yfin.model.EconomicEvent;
 import io.github.andreygrigoriev.yfin.model.IpoEvent;
 import io.github.andreygrigoriev.yfin.model.LookupResult;
 import io.github.andreygrigoriev.yfin.model.PriceHistory;
+import io.github.andreygrigoriev.yfin.model.Quote;
 import io.github.andreygrigoriev.yfin.model.ScreenerResult;
 import io.github.andreygrigoriev.yfin.model.SearchResult;
 import io.github.andreygrigoriev.yfin.model.SplitEvent;
@@ -191,6 +194,40 @@ public final class YFinance implements AutoCloseable {
             throw new YFDownloadException(failures, results);
         }
         return Collections.unmodifiableMap(results);
+    }
+
+    /** Symbols per {@code /v7/finance/quote} request made by {@link #quotes(Collection)}. */
+    public static final int QUOTE_BATCH_SIZE = 200;
+
+    /**
+     * Real-time quotes of {@code symbols} from the batched {@code /v7/finance/quote} endpoint,
+     * {@value #QUOTE_BATCH_SIZE} symbols per request, so a thousand symbols cost five requests
+     * instead of a thousand. Requests are issued one after another and go through the client's
+     * request limiter. Symbols are normalized like {@link #ticker(String)} and deduplicated; the
+     * map iterates in the order Yahoo returns the quotes, batch by batch. Symbols Yahoo does not
+     * know are absent from the map. An empty input gives an empty map without a request.
+     *
+     * <p>Strict: if any batch fails, the exception of the first failing batch is thrown and no
+     * partial result is returned.
+     *
+     * @throws YFinanceException when a batch fails (transport, rate limit, malformed payload)
+     * @throws IllegalArgumentException when a symbol is blank
+     * @throws IllegalStateException when the client is closed
+     */
+    public Map<String, Quote> quotes(Collection<String> symbols) {
+        ensureOpen();
+        SequencedSet<String> normalized = normalizeSymbols(symbols);
+        Map<String, Quote> result = new LinkedHashMap<>();
+        if (normalized.isEmpty()) {
+            return Collections.unmodifiableMap(result);
+        }
+        QuoteEndpoint endpoint = new QuoteEndpoint(session());
+        List<String> all = List.copyOf(normalized);
+        for (int from = 0; from < all.size(); from += QUOTE_BATCH_SIZE) {
+            List<String> batch = all.subList(from, Math.min(all.size(), from + QUOTE_BATCH_SIZE));
+            endpoint.quotes(batch).forEach((symbol, json) -> result.put(symbol, QuoteMapper.map(symbol, json)));
+        }
+        return Collections.unmodifiableMap(result);
     }
 
     /**
