@@ -23,6 +23,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -75,6 +76,8 @@ public final class LiveStream implements AutoCloseable {
     private int generation;
     /** Consecutive connections that failed or ended before delivering a frame. */
     private int failedAttempts;
+
+    private final AtomicLong framesReceived = new AtomicLong();
 
     private boolean reconnectScheduled;
     private boolean closed;
@@ -172,6 +175,14 @@ public final class LiveStream implements AutoCloseable {
         synchronized (lock) {
             return socket != null && !closed;
         }
+    }
+
+    /**
+     * Number of text frames received from the streamer so far, whether or not they carried a tick.
+     * Useful to tell a silent connection from one that only sends non-pricing frames.
+     */
+    public long framesReceived() {
+        return framesReceived.get();
     }
 
     /** Whether {@link #close()} has been called. */
@@ -398,6 +409,7 @@ public final class LiveStream implements AutoCloseable {
             return;
         }
         if (tick == null) {
+            LOG.debug("frame without a pricing message: {}", frame.length() > 200 ? frame.substring(0, 200) : frame);
             return;
         }
         try {
@@ -474,6 +486,7 @@ public final class LiveStream implements AutoCloseable {
             }
             String frame = text.toString();
             text.setLength(0);
+            framesReceived.incrementAndGet();
             if (!healthy) {
                 healthy = true;
                 connectionHealthy(gen);
