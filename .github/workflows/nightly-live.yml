@@ -30,6 +30,11 @@ jobs:
           java-version: "25"
           cache: maven
 
+      # the wrapper downloads Maven with a single wget and no retry; a transient Central blip
+      # otherwise fails the run before any test starts (#9)
+      - name: Bootstrap Maven wrapper
+        run: for i in 1 2 3; do ./mvnw --version && exit 0; sleep 20; done; exit 1
+
       - name: Live integration tests
         run: ./mvnw --batch-mode --no-transfer-progress verify -Plive
 
@@ -55,6 +60,11 @@ jobs:
           distribution: graalvm
           github-token: ${{ secrets.GITHUB_TOKEN }}
           cache: maven
+
+      # the wrapper downloads Maven with a single wget and no retry; a transient Central blip
+      # otherwise fails the run before any test starts (#9)
+      - name: Bootstrap Maven wrapper
+        run: for i in 1 2 3; do ./mvnw --version && exit 0; sleep 20; done; exit 1
 
       - name: Native smoke against live Yahoo
         run: >-
